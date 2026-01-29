@@ -1,5 +1,5 @@
 # Replication: Feng (2026)
-Replication files for simulation and empirical illustration in Feng (2024)
+Replication files for simulation and empirical illustration in Feng (2026)
 
 # Reference
 Feng (2026). [Causal Inference in Possibly Nonlinear Factor Models](https://drive.google.com/file/d/1zIond_B7rAXbq1h24aKCnrWIkmmTbC_D/view?usp=drive_link).  
