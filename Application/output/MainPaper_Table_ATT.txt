@@ -5,19 +5,15 @@
 \multicolumn{1}{l}{}&\multicolumn{1}{c}{Full Sample}&\multicolumn{1}{c}{Base Sample}&\multicolumn{1}{c}{}&\multicolumn{1}{c}{Full Sample}&\multicolumn{1}{c}{Base Sample}\tabularnewline
 \hline
 {\bfseries Local PCA, $K=$}&&&&&\tabularnewline
-~~50&0.095&0.083&&0.075&0.053\tabularnewline
-~~&[-0.054, 0.054]&[-0.049, 0.049]&&[-0.054, 0.054]&[-0.052, 0.052]\tabularnewline
-~~99&0.103&0.094&&0.089&0.073\tabularnewline
-~~&[-0.054, 0.054]&[-0.051, 0.051]&&[-0.052, 0.052]&[-0.049, 0.049]\tabularnewline
-~~198&0.105&0.098&&0.092&0.085\tabularnewline
-~~&[-0.055, 0.055]&[-0.053, 0.053]&&[-0.055, 0.055]&[-0.052, 0.052]\tabularnewline
+~~50&0.096&0.077&&0.060&0.057\tabularnewline
+~~&(0.028)&(0.029)&&(0.024)&(0.03)\tabularnewline
+~~99&0.105&0.087&&0.049&0.074\tabularnewline
+~~&(0.028)&(0.026)&&(0.027)&(0.032)\tabularnewline
+~~198&0.107&0.093&&0.064&0.080\tabularnewline
+~~&(0.028)&(0.026)&&(0.029)&(0.03)\tabularnewline
 \hline
-{\bfseries Acemoglu et al. (2016)}&&&&&\tabularnewline
-~~Estimate&0.005&0.060&&-&-\tabularnewline
-~~AR for TE=0&[-0.029, 0.014]&[-0.068, 0.036]&&-&-\tabularnewline
-\hline
-{\bfseries Abadie and L'Hour (2021)}&&&&&\tabularnewline
-~~Estimate&-&0.061&&-&-\tabularnewline
-~~AR for TE=0&-&[-0.050, 0.061]&&-&-\tabularnewline
+{\bfseries Double lasso}&&&&&\tabularnewline
+~~&0.099&0.104&&0.092&0.109\tabularnewline
+~~&(0.034)&(0.04)&&(0.033)&(0.042)\tabularnewline
 \hline
 \end{tabular}
