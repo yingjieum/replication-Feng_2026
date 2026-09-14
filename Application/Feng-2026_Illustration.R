@@ -19,8 +19,15 @@ library(hdm)
 
 source("Feng-2026_Illustration_funs.R")
 
+# Reviewer 4 checks: run from Application/; existing main outputs are skipped with
+# FENG_CHECKS_ONLY=1 Rscript --vanilla Feng-2026_Illustration.R
+# Set FENG_RUN_CHECKS=0 to reproduce only the original paper analysis.
+check.only <- identical(Sys.getenv("FENG_CHECKS_ONLY"), "1")
+run.checks <- check.only || !identical(Sys.getenv("FENG_RUN_CHECKS"), "0")
+dir.create("output", showWarnings=FALSE)
+
 # Load data
-data <- readMat("Data.mat")
+data <- readMat("data.mat")
 ret <- data$Re
 connect <- data$num[,3] #1: Shared Board 2: NY Connection 3: Geithner Schedule 4: Geithner Schedule 2007 
 d <- 1*(connect>0)
@@ -42,8 +49,13 @@ range  <- 1:n
 subset <- (d.full==0)
 pr     <- mean(d.full)
 # A data-driven benchmark choice
+if (check.only) {
+  K0 <- 99L # Established paper benchmark; no new K search in the revised checks.
+} else {
 Klist  <- 80:200
-K0     <- Klist[which.min(knn.cv(nfolds=n, y=y.full, x=x.full[,p,drop=F], k=Klist, type="R")$crit)]
+Kcrit  <- knn.cv(nfolds=n, y=y.full, x=x.full[,p,drop=F], k=Klist, type="R")$crit
+K0     <- Klist[which.min(Kcrit)]
+}
 # several choices of K based on K0
 Kseq   <- ceiling(K0 * c(.5, 1, 2))
 
@@ -52,6 +64,15 @@ Kseq   <- ceiling(K0 * c(.5, 1, 2))
 
 # Step 1: latent variables extraction
 # Step 1.1: illustrate KNN matching
+
+# ---- Reviewer 4 / Step 1.1: all-center matching, treatment cells, and blocked splits.
+if (run.checks) {
+  checks <- check_setup(data, x.full, y.full, d.full, ctrlvar, K0)
+  check_matching(checks)
+}
+# ---- End Reviewer 4 / Step 1.1 checks.
+
+if (!check.only) {
 kmat      <- knn.index(A=x.full[,1:(p/2)], K=K0)
 distmat   <- dist.knn(A=x.full[,1:(p/2)])
 i         <- which(d.full==1)[1]
@@ -73,19 +94,36 @@ latex(sum.table, file=paste("output/MainPaper_Table_SumKNN", ".txt", sep = ""),
 
 # label outliers
 outlier <- which(dist.norm>=quantile(dist.norm[d.full==0], .9))
+}
 
 
 # Step 1.2: illustrate local PCA
+
+# ---- Reviewer 4 / Step 1.2: full local spectra/dimensions and rotation-invariant spaces.
+if (run.checks) check_factors(checks)
+# ---- End Reviewer 4 / Step 1.2 checks.
+
+if (!check.only) {
 index <- kmat[,i]   # length n
 PC    <- lpca(A=x.full[,-(1:(p/2))], index=index, nlam=5, n=n, K=K0)
 ggplot()+geom_line(data=data.frame(x=1:5, y=PC$sv), aes(x=x,y=y))+
          xlab("Component Number")+ylab("Singular value")+
          theme_bw() + theme(panel.grid.minor = element_blank())
 ggsave("output/scree.pdf", width = 5, height = 3)
+}
 
 
 ##################################################
 # Step 2: local least squares
+
+# ---- Reviewer 4 / Step 2: unseen-unit/held-out-proxy prediction, overlap, and balance.
+if (run.checks) {
+  check_heldout(checks)
+  check_nuisance(checks)
+}
+# ---- End Reviewer 4 / Step 2 checks.
+
+if (!check.only) {
 
 # fitted sequence from day -30 to 1
 N1 <- sum(d.full)
@@ -164,10 +202,22 @@ plot.single <- plot.single + geom_vline(xintercept = -.5, linetype="dashed", col
                      legend.background = element_rect(fill="transparent"),
                      panel.grid.minor = element_blank(),panel.grid.major = element_blank())
 ggsave("output/fit_single.pdf", width = 5, height = 4)
+}
 
 
 ################################################
 # Step 3: calculate ATT
+
+# ---- Reviewer 4 / Step 3: pre-treatment placebos and broader ATT sensitivities.
+# Trimming removes poorly matched controls only, preserving each sample's treated target.
+if (run.checks) {
+  check_placebos(checks)
+  check_sensitivity(checks)
+  check_finish(checks)
+}
+# ---- End Reviewer 4 / Step 3 checks.
+
+if (!check.only) {
 
 # full sample
 n <- length(y.full); subset <- (d.full==0); pr <- mean(d.full)
@@ -479,5 +529,5 @@ plot <- plot + geom_line(aes(x=x, y=F11, colour="Y(1)|D=1", linetype="Y(1)|D=1")
                      legend.background = element_rect(fill="transparent"),
                      panel.grid.major=element_blank(), panel.grid.minor = element_blank())
 ggsave("output/SD.pdf", width = 6, height=3)
-
+}
 
