@@ -425,7 +425,7 @@ dr_att <- function(y, d, x, ps_tol = 1e-6) {
   return(list(te = tau_hat, se  = se_hat))
 }
 
-# small simulation function for DR ATT only
+# small simulation function for Figure 1's three ATT estimators
 sim.selonx <- function(i, n, p, model, theta0, err, rho, dim.alp, nx=1) {
   data   <- dgp(n=n, p=p, hdmodel=model, err=err, rho=rho, dim.alp=dim.alp)
   
@@ -444,9 +444,26 @@ sim.selonx <- function(i, n, p, model, theta0, err, rho, dim.alp, nx=1) {
   dr.rej   <- (((dr.theta-theta0)/dr.se > qnorm(0.975)) | ((dr.theta-theta0)/dr.se < qnorm(0.025))) * 1
   dr.ci    <- dr.se*qnorm(0.975)*2
   
+  # proposed approach, using the same data and tuning rule as sim()
+  Kbase <- n^(4/(4+dim.alp))
+  Klist <- seq(ceiling(0.5*Kbase), ceiling(2*Kbase), 5)
+  x.cv <- if (dim.alp==1) data$x[,p,drop=F] else data$x[,c(p-1,p),drop=F]
+  K0 <- Klist[which.min(knn.cv(nfolds=20, y=data$y, x=x.cv, k=Klist, type="R")$crit)]
+  lpca.fit <- compute(range=1:n, y=data$y, d=data$d, x=data$x, subset=(data$d==0),
+                      Kseq=K0, nlam=4, n=n, p=p, const=F)
+  pr <- mean(data$d)
+  lpca.score <- (data$d*(data$y-lpca.fit$yfit[1,]) -
+                  (1-data$d)*(data$y-lpca.fit$yfit[1,])*lpca.fit$ps[1,]/(1-lpca.fit$ps[1,]))/pr
+  lpca.theta <- mean(lpca.score)
+  lpca.varphi <- lpca.score - data$d*lpca.theta/pr   # same ATT influence function as te.stats()
+  lpca.se <- sqrt(mean(lpca.varphi^2)/n)
+  lpca.rej <- as.numeric(abs((lpca.theta-theta0)/lpca.se) > qnorm(0.975))
+  lpca.ci <- lpca.se*qnorm(0.975)*2
+
   # combine results
   result <- cbind(c(-1, dr.theta, dr.se, dr.rej, dr.ci),
-                  c(-2, lasso.theta, lasso.se, lasso.rej, lasso.ci))
+                  c(-2, lasso.theta, lasso.se, lasso.rej, lasso.ci),
+                  c(K0, lpca.theta, lpca.se, lpca.rej, lpca.ci))
   
-  return(result)  # (4+1) by 1+1 matrix, -1: select on nx controls, -2: double lasso
+  return(result)  # 5 by 3 matrix; first row: -1 (nx controls), -2 (double lasso), selected K (proposed)
 }

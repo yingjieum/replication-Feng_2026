@@ -73,6 +73,8 @@ write.table(output, paste("output/rawoutput_par", j, "txt", sep = "."), sep = ",
 
 
 ###### Only used to generate Figure 1 in the paper #############################
+library(ggplot2)
+dir.create("output", showWarnings = FALSE)
 theta0 <- 1.539319 # dim 1
 #theta0 <- 0.9459911 # dim 2
 rep <- 2000
@@ -85,10 +87,10 @@ model.f1 <- function(u, v) {
 cl <- makeCluster(23)
 registerDoParallel(cl)
 
-output <- foreach (i = 1:rep, .options.RNG=1234, .packages=c('Rfast','RcppNumerical','hdm'),
+output <- foreach (i = 1:rep, .options.RNG=1234, .packages=c('Rfast','irlba','RcppNumerical','hdm'),
                    .combine=rbind) %dorng% {
                     output <- sim.selonx(i, n=500, p=250, model=model.f1, theta0=theta0, err=0, rho=0, dim.alp=1, nx=10)
-                    output   # (5*rep) by (1+1) matrix
+                    output   # (5*rep) by 3 matrix
                    }
 
 stopCluster(cl)
@@ -100,11 +102,16 @@ t.dr     <- (est.dr-theta0)/se.dr
 est.la   <- output[rownum==2,2] 
 se.la    <- output[rownum==3,2]
 t.la     <- (est.la-theta0)/se.la
+est.lpca <- output[rownum==2,3]
+se.lpca  <- output[rownum==3,3]
+t.lpca   <- (est.lpca-theta0)/se.lpca
 
 df <- rbind(
   data.frame(value = t.dr, series = "10 proxies"),
-  data.frame(value = t.la, series = "double lasso")
+  data.frame(value = t.la, series = "double lasso"),
+  data.frame(value = t.lpca, series = "Proposed approach")
 )
+df$series <- factor(df$series, levels = c("10 proxies", "double lasso", "Proposed approach"))
 
 hist <- ggplot(df, aes(x = value)) +
   geom_histogram(aes(y = after_stat(density)),
@@ -120,4 +127,4 @@ hist <- ggplot(df, aes(x = value)) +
   ) +
   labs(x = NULL, y = "Density")
 
-ggsave("hist_dr_la.pdf", plot = hist, width = 8, height = 3, dpi = 300)
+ggsave("output/hist_dr_la_lpca.pdf", plot = hist, width = 9, height = 3, dpi = 300)
