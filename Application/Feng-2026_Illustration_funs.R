@@ -152,7 +152,7 @@ compute <- function(range, y, d, x, subset=NULL, K, nlam, n, p, const=F, ctrlvar
 }
 
 ############################################################
-# Reviewer 4 diagnostics: separate from the benchmark helpers.
+# Additional empirical diagnostics, separate from the benchmark helpers.
 
 # Run a stochastic check without changing the main analysis's RNG state.
 check_seed <- function(seed, expr) {
@@ -176,7 +176,7 @@ check_capture <- function(expr) {
   list(value=value, warnings=unique(warnings))
 }
 
-# Save an auditable table; all new files have the requested check- prefix.
+# Save an auditable table using the check- prefix.
 check_write <- function(state, name, tab) {
   state$tables[[name]] <- tab
   write.csv(tab, file.path(state$output, paste0("check-", name, ".csv")),
@@ -230,7 +230,7 @@ check_setup <- function(data, x, y, d, z, K,
   state
 }
 
-# Compute center-inclusive neighborhoods under the three manuscript distances.
+# Compute center-inclusive neighborhoods under the three implemented distances.
 check_neighbors <- function(state, s, tag, split="benchmark", K=state$K,
                             distance="pseudo-max") {
   key <- paste("neighbors", tag, split, K, distance, sep="|")
@@ -470,11 +470,11 @@ check_heldout <- function(state) {
         identical(sort(unlist(cols,use.names=FALSE)),seq_len(ncol(s$x))))
       definitions[[paste(nm,name)]] <- do.call(rbind,lapply(names(cols),function(g)
         data.frame(sample=nm,design=name,group=g,proxy=cols[[g]],event_day=cols[[g]]-281)))
-      message("Reviewer 4 prediction: ",nm," / ",name)
+      message("Held-out prediction: ",nm," / ",name)
       tabs[[paste(nm,name)]] <- check_prediction_design(state,s,nm,name,cols$match,cols$pca,
         s$x[,cols$hold,drop=FALSE])
     }
-    message("Reviewer 4 untreated-outcome validation: ",nm," / K=",state$K)
+    message("Untreated-outcome validation: ",nm," / K=",state$K)
     v <- check_prediction_design(state,s,nm,"untreated_event",state$splits$benchmark$match,
       state$splits$benchmark$pca,s$y[,1,drop=FALSE],controls_only=TRUE)
     outcome[[nm]] <- v[v$treated==0,]
@@ -561,7 +561,7 @@ check_placebos <- function(state) {
 
 # Step 3: broaden sensitivities, distinguishing control and treated-score trimming.
 check_sensitivity <- function(state) {
-  # R4-requested choices at fixed K: dimension rules, distances, ordered splits, trimming.
+  # Sensitivity choices at fixed K: dimension rules, distances, ordered splits, and trimming.
   specs <- list(benchmark=list(),threshold075=list(multiplier=.75),threshold125=list(multiplier=1.25),
     squaredEuclidean=list(distance="squared-Euclidean"),averages=list(distance="averages"),
     reversed=list(split="reversed"),boundary100=list(split="boundary100"),boundary150=list(split="boundary150"),
@@ -596,7 +596,7 @@ check_sensitivity <- function(state) {
   for (nm in names(state$samples)) {
     original <- state$samples[[nm]]
     for (spec in names(specs)) {
-      message("Reviewer 4 sensitivity: ",nm," / ",spec)
+      message("Sensitivity: ",nm," / ",spec)
       options <- specs[[spec]]; s <- original; tag <- nm; dropped <- 0L
       if (!is.null(options$trim)) {
         discrepancy <- check_neighbors(state,s,nm)$tab$normalized_max
@@ -613,8 +613,8 @@ check_sensitivity <- function(state) {
           dropped_controls=dropped)
       }
     }
-    # The SA also reports a treated-score sensitivity: remove benchmark-treated
-    # firms with a covariate-adjusted propensity above 0.9, then refit everything.
+    # Treated-score sensitivity: remove benchmark-treated firms with a
+    # covariate-adjusted propensity above 0.9, then refit everything.
     baseline <- state$baseline[[paste(nm,TRUE,sep="|")]]
     drop <- original$d==1 & baseline$ps>.9
     stopifnot(sum(drop)==1L)
@@ -629,7 +629,7 @@ check_sensitivity <- function(state) {
   invisible(state)
 }
 
-# Scientific review figures: show every active specification, with explicit failure labels.
+# Diagnostic figures show every active specification with explicit failure labels.
 check_figures <- function(state,only=NULL) {
   draw <- function(name,expr,layout=c(2,2)) {
     if(!is.null(only) && !name %in% only) return(invisible(NULL))
@@ -710,7 +710,7 @@ check_figures <- function(state,only=NULL) {
       segments(v$lower[good],(idx+shift)[good],v$upper[good],(idx+shift)[good],col=ifelse(v$covariates[good],"gray45","black"));abline(v=0,lty=2)
       if(any(!good)) text(mean(lim),(idx+shift)[!good],"Numerical issue: see full CSV",cex=.7)
     }
-    mtext("Requested sensitivities at K=99; black: without controls, gray: with controls",outer=TRUE,font=2)
+    mtext("Sensitivity analyses at K=99; black: without controls, gray: with controls",outer=TRUE,font=2)
   },layout=c(1,2))
   invisible(state)
 }
@@ -737,7 +737,7 @@ check_prediction_summary <- function(tab,outcome=FALSE) {
 check_report <- function(state) {
   check_write(state,"prediction-gains",check_prediction_summary(state$tables[["heldout-prediction"]]))
   check_write(state,"outcome-gains",check_prediction_summary(state$tables[["outcome-prediction"]],TRUE))
-  # Author-requested reporting focus on the later block of the gapless design.
+  # Primary reporting focus: treated firms in the later block of the gapless design.
   focus <- subset(state$tables[["prediction-gains"]],design=="chronological_gapless" & group=="treated")
   focus$prediction_first_day <- -80L
   focus$prediction_last_day <- -31L
@@ -768,7 +768,7 @@ check_report <- function(state) {
     lines <- c(lines,sprintf("| %s | %d / %d | %d / %d | %.4f (%.4f) | %.4f (%.4f) |",v$sample,v$n,v$treated,v$dimension1,v$dimension2,v$ATT_no_controls,v$SE_no_controls,v$ATT_with_controls,v$SE_with_controls))
   }
   lines <- c(lines,"","All treated centers select one factor. The four-component cap does not bind; thirteen control neighborhoods in each sample retain one component despite no signal above the rule's threshold. Exact singular values and eigenvalues normalized by neighborhood size times PCA-column count are available for every center. The selection threshold is a local-data-scale heuristic, not an independently estimated noise variance.","",
-    "## Ordered splits and requested sensitivity","",
+    "## Ordered splits and sensitivity analyses","",
     "Every matching/PCA group is one contiguous chronological block. The benchmark uses 125/125 columns; alternatives swap halves or move the boundary to 100/150 and 150/100. Dates are never shuffled, interleaved, or reversed within a group. Fixed-neighborhood projection distances compare factor spaces without depending on rotations.","")
   for(nm in names(state$samples)) {
     v <- subset(tabs[["split-stability"]],sample==nm & treated==1)
@@ -777,20 +777,20 @@ check_report <- function(state) {
     for(cov in c(FALSE,TRUE)) {
       v <- subset(tabs$sensitivity,sample==nm & covariates==cov)
       good <- v$near_one_control_score==0 & is.finite(v$att) & is.finite(v$se)
-      lines <- c(lines,sprintf("- %s, %s controls: ATT across the %d requested specifications ranges %.4f-%.4f; %d nominal 95%% intervals exclude zero. Specifications with nonfinite ATT/SE or control scores above 1-1e-8: %d (full results retained in CSV).",nm,if(cov)"with" else "without",nrow(v),min(v$att[good]),max(v$att[good]),sum(v$lower[good]>0 | v$upper[good]<0),sum(!good)))
+      lines <- c(lines,sprintf("- %s, %s controls: ATT across the %d specifications ranges %.4f-%.4f; %d nominal 95%% intervals exclude zero. Specifications with nonfinite ATT/SE or control scores above 1-1e-8: %d (full results retained in CSV).",nm,if(cov)"with" else "without",nrow(v),min(v$att[good]),max(v$att[good]),sum(v$lower[good]>0 | v$upper[good]<0),sum(!good)))
     }
   }
-  lines <- c(lines,"","Threshold multipliers 0.75/1.25, the two alternative manuscript distances, and 90th/95th-percentile poor-match control trimming supplement split sensitivity. Poor-match trimming retains every treated firm. The separate propensity-score check drops the one treated firm above 0.9 in each benchmark sample. Each trim recomputes neighborhoods and nuisances. These are illustrative sensitivity comparisons, not evidence that every alternative distance meets the identifying assumptions.","",
+  lines <- c(lines,"","Threshold multipliers 0.75/1.25, the two alternative implemented distances, and 90th/95th-percentile poor-match control trimming supplement split sensitivity. Poor-match trimming retains every treated firm. The separate propensity-score check drops the one treated firm above 0.9 in each benchmark sample. Each trim recomputes neighborhoods and nuisances. These are illustrative sensitivity comparisons, not evidence that every alternative distance meets the identifying assumptions.","",
     "## Prediction beyond observed covariates","",
     "Five-fold held-out prediction compares local PCA plus the same controls with (i) covariate-only linear regression and (ii) K=99 nearest-neighbor means using standardized observed covariates alone. Covariate-only models never use proxy-based neighborhoods. PCA and regressions exclude the entire test fold. The three proxy groups are disjoint contiguous chronological blocks and use all 250 dates.","",
     "A positive MSE gain means improvement over that covariate-only comparator; a negative gain means higher prediction error. These are descriptive gains, without significance claims.","",
-    "The author-requested focus is treated firms in the later prediction block, days [-80,-31]. This is relevant to the ATT target population and uses returns closer to treatment. Matching uses [-280,-181], PCA uses [-180,-81], and the last 30 pre-event days remain excluded. Each prediction date has its own regression; MSE averages squared errors over the 50 dates and treated firms, rather than summing returns into a CAR.","",
+    "The primary reported comparison focuses on treated firms in the later prediction block, days [-80,-31]. This is relevant to the ATT target population and uses returns closer to treatment. Matching uses [-280,-181], PCA uses [-180,-81], and the last 30 pre-event days remain excluded. Each prediction date has its own regression; MSE averages squared errors over the 50 dates and treated firms, rather than summing returns into a CAR.","",
     "| Sample | Treated firms | Prediction days | MSE gain vs covariate linear | MSE gain vs covariate KNN |","| --- | ---: | --- | ---: | ---: |")
   for(i in seq_len(nrow(focus))) {
     v <- focus[i,]
     lines <- c(lines,sprintf("| %s | %d | [-80,-31] | %.2f%% | %.2f%% |",v$sample,v$units,v$gain_vs_covariates_linear,v$gain_vs_covariates_knn))
   }
-  lines <- c(lines,"","The later-block focus and the gapless 100/100/50 allocation were requested after reviewing the earlier packet, before these new gains were computed. Folds, K and model settings were preserved; no alternative windows were searched. [Treated-focus CSV](check-treated-proxy-focus.csv) records absolute MSEs and sample/date definitions. The reversed-block treated and all-firm results remain in the prediction CSV and figure regardless of sign.","",
+  lines <- c(lines,"","The later-block focus and the gapless 100/100/50 allocation were fixed before these gains were computed. Folds, K and model settings were preserved; no alternative windows were searched. [Treated-focus CSV](check-treated-proxy-focus.csv) records absolute MSEs and sample/date definitions. The reversed-block treated and all-firm results remain in the prediction CSV and figure regardless of sign.","",
     "All-firm averages remain supporting comparisons:","",
     "| Sample | Held-out design | MSE gain vs covariate linear | MSE gain vs covariate KNN |","| --- | --- | ---: | ---: |")
   for(i in which(tabs[["prediction-gains"]]$group=="all")) {
@@ -837,7 +837,7 @@ check_report <- function(state) {
   invisible(summary)
 }
 
-# Preserve audit inputs, seeds and predictions alongside the revised reports.
+# Preserve audit inputs, seeds, and predictions alongside the reports.
 check_finish <- function(state) {
   check_report(state)
   check_figures(state)
@@ -946,25 +946,15 @@ application_figure_eigen_ratios <- function(signals, output) {
   path
 }
 
-# Export every empirical table and figure currently reported in the paper or supplement.
-write_application_outputs <- function(state, output="output") {
-  dir.create(output,showWarnings=FALSE,recursive=TRUE)
-  tabs <- state$tables
-  required <- c("sensitivity","split-stability","factor-space","prediction-gains",
-    "outcome-gains","placebos","dimensions","signals","balance","neighborhoods")
-  stopifnot(all(required %in% names(tabs)))
-  files <- c(
-    application_figure_singular_ratio(tabs$signals,output),
-    application_figure_matching(tabs$neighborhoods,output),
-    application_figure_eigen_ratios(tabs$signals,output))
-
-  # Sensitivity to proxy splitting, poor-match trimming, and high treated scores.
-  sensitivity <- tabs$sensitivity
+# Write the paper-ready ATT sensitivity table from freshly computed checks.
+application_write_sensitivity <- function(sensitivity, output="output") {
   pick_sensitivity <- function(sample_name,spec,with_covariates)
     sensitivity[sensitivity$sample==sample_name & sensitivity$specification==spec &
       sensitivity$covariates==with_covariates,]
-  specs <- c("benchmark","reversed","boundary100","boundary150","trim90","trim95")
-  labels <- c("Benchmark 125/125","Swapped halves","Matching 100, PCA 150",
+  specs <- c("benchmark","threshold075","threshold125","reversed","boundary100",
+    "boundary150","trim90","trim95")
+  labels <- c("Benchmark 125/125","$0.75\\times$ dimension threshold",
+    "$1.25\\times$ dimension threshold","Swapped halves","Matching 100, PCA 150",
     "Matching 150, PCA 100","Trim top 10\\%","Trim top 5\\%")
   rows <- vapply(seq_along(specs),function(i) {
     v <- lapply(c("full","base"),function(sample)
@@ -982,11 +972,31 @@ write_application_outputs <- function(state, output="output") {
     sprintf("%.3f (%.3f)",x$att,x$se)
   })
   rows <- c(rows,sprintf("Propensity trim $>0.9$ & -- & -- & %s & %s \\\\",ps[[1]],ps[[2]]))
-  files <- c(files,application_write_table(output,"SA_Table_Application_Sensitivity.txt",c(
+  application_write_table(output,"SA_Table_Application_Sensitivity.txt",c(
     "\\begin{tabular}{lcccc}","\\hline\\hline",
     "& \\multicolumn{2}{c}{No covariates} & \\multicolumn{2}{c}{With covariates} \\\\",
     "\\cline{2-3}\\cline{4-5}","Specification & Full & Base & Full & Base \\\\",
-    "\\hline",rows,"\\hline","\\end{tabular}")))
+    "\\hline",rows,"\\hline","\\end{tabular}"))
+}
+
+# Export every empirical table and figure currently reported in the paper or supplement.
+write_application_outputs <- function(state, output="output") {
+  dir.create(output,showWarnings=FALSE,recursive=TRUE)
+  tabs <- state$tables
+  required <- c("sensitivity","split-stability","factor-space","prediction-gains",
+    "outcome-gains","placebos","dimensions","signals","balance","neighborhoods")
+  stopifnot(all(required %in% names(tabs)))
+  files <- c(
+    application_figure_singular_ratio(tabs$signals,output),
+    application_figure_matching(tabs$neighborhoods,output),
+    application_figure_eigen_ratios(tabs$signals,output))
+
+  files <- c(files,application_write_sensitivity(tabs$sensitivity,output))
+
+  sensitivity <- tabs$sensitivity
+  pick_sensitivity <- function(sample_name,spec,with_covariates)
+    sensitivity[sensitivity$sample==sample_name & sensitivity$specification==spec &
+      sensitivity$covariates==with_covariates,]
 
   # Neighbor and loading-space stability across ordered proxy splits.
   overlap <- tabs[["split-stability"]]; spaces <- tabs[["factor-space"]]

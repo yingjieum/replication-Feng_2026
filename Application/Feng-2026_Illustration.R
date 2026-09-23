@@ -50,7 +50,7 @@ subset <- (d.full==0)
 pr     <- mean(d.full)
 # A data-driven benchmark choice
 if (check.only) {
-  K0 <- 99L # Established paper benchmark; no new K search in the revised checks.
+  K0 <- 99L # Established benchmark for diagnostics-only runs.
 } else {
 Klist  <- 80:200
 Kcrit  <- knn.cv(nfolds=n, y=y.full, x=x.full[,p,drop=F], k=Klist, type="R")$crit
@@ -65,12 +65,12 @@ Kseq   <- ceiling(K0 * c(.5, 1, 2))
 # Step 1: latent variables extraction
 # Step 1.1: illustrate KNN matching
 
-# ---- Reviewer 4 / Step 1.1: all-center matching, treatment cells, and blocked splits.
+# Additional diagnostics: all-center matching, treatment cells, and blocked splits.
 if (run.checks) {
   checks <- check_setup(data, x.full, y.full, d.full, ctrlvar, K0)
   check_matching(checks)
 }
-# ---- End Reviewer 4 / Step 1.1 checks.
+# End matching diagnostics.
 
 if (!check.only) {
 kmat      <- knn.index(A=x.full[,1:(p/2)], K=K0)
@@ -99,9 +99,9 @@ outlier <- which(dist.norm>=quantile(dist.norm[d.full==0], .9))
 
 # Step 1.2: illustrate local PCA
 
-# ---- Reviewer 4 / Step 1.2: full local spectra/dimensions and rotation-invariant spaces.
+# Additional diagnostics: full local spectra, dimensions, and rotation-invariant spaces.
 if (run.checks) check_factors(checks)
-# ---- End Reviewer 4 / Step 1.2 checks.
+# End local-factor diagnostics.
 
 if (!check.only) {
 index <- kmat[,illustration.unit]   # length n
@@ -116,12 +116,12 @@ ggsave("output/scree.pdf", width = 5, height = 3)
 ##################################################
 # Step 2: local least squares
 
-# ---- Reviewer 4 / Step 2: unseen-unit/held-out-proxy prediction, overlap, and balance.
+# Additional diagnostics: held-out prediction, overlap, and balance.
 if (run.checks) {
   check_heldout(checks)
   check_nuisance(checks)
 }
-# ---- End Reviewer 4 / Step 2 checks.
+# End prediction, overlap, and balance diagnostics.
 
 if (!check.only) {
 
@@ -193,14 +193,14 @@ ggsave("output/fit.pdf", width = 5, height = 4)
 ################################################
 # Step 3: calculate ATT
 
-# ---- Reviewer 4 / Step 3: pre-treatment placebos and broader ATT sensitivities.
+# Additional diagnostics: pre-treatment placebos and ATT sensitivities.
 # Poor-match trimming preserves treated firms; the score trim changes the treated target.
 if (run.checks) {
   check_placebos(checks)
   check_sensitivity(checks)
   check_finish(checks)
 }
-# ---- End Reviewer 4 / Step 3 checks.
+# End placebo and sensitivity diagnostics.
 
 if (!check.only) {
 
