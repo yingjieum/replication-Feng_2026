@@ -1,0 +1,10 @@
+\begin{tabular}{llrcc}
+\hline\hline
+Sample & Prediction target & Firms & Linear gain (\%) & $K$-NN gain (\%) \\
+\hline
+Full & Treated daily proxies & 22 & 24.15 & 10.26 \\
+Base & Treated daily proxies & 12 & 23.75 & 3.08 \\
+Full & Untreated CAR[0,1] & 561 & 13.61 & 13.42 \\
+Base & Untreated CAR[0,1] & 514 & 16.98 & 16.03 \\
+\hline
+\end{tabular}

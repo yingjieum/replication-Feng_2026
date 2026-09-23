@@ -1,7 +1,7 @@
 #####################################################
 ##### Causal Inference in Nonlinear Factor Models ###
 ############ Empirical Application ##################
-########### Last updated: 01/21/2026 ################
+########### Last updated: 09/23/2026 ################
 #####################################################
 # This file replicates the results in Feng (2026)
 # Data source: Acemoglu et al (JFE, 2016) 
@@ -19,7 +19,7 @@ library(hdm)
 
 source("Feng-2026_Illustration_funs.R")
 
-# Reviewer 4 checks: run from Application/; existing main outputs are skipped with
+# Empirical diagnostics: run from Application/; original main outputs are skipped with
 # FENG_CHECKS_ONLY=1 Rscript --vanilla Feng-2026_Illustration.R
 # Set FENG_RUN_CHECKS=0 to reproduce only the original paper analysis.
 check.only <- identical(Sys.getenv("FENG_CHECKS_ONLY"), "1")
@@ -60,7 +60,7 @@ K0     <- Klist[which.min(Kcrit)]
 Kseq   <- ceiling(K0 * c(.5, 1, 2))
 
 ##########################################################
-# Only for Step 1 and 2 illustration, choose one K=Ksea[3]
+# Step 1 and 2 illustrations use the benchmark K.
 
 # Step 1: latent variables extraction
 # Step 1.1: illustrate KNN matching
@@ -75,7 +75,7 @@ if (run.checks) {
 if (!check.only) {
 kmat      <- knn.index(A=x.full[,1:(p/2)], K=K0)
 distmat   <- dist.knn(A=x.full[,1:(p/2)])
-i         <- which(d.full==1)[1]
+illustration.unit <- 23L # American Express Co., as described in the paper.
 pos       <- kmat; diag(pos) <- F    # remove itself in summary
 dist.norm <- sapply(1:n, function(i) max(distmat[pos[,i],i])/sd(distmat[-i,i])) # normalized distance
 
@@ -104,7 +104,7 @@ if (run.checks) check_factors(checks)
 # ---- End Reviewer 4 / Step 1.2 checks.
 
 if (!check.only) {
-index <- kmat[,i]   # length n
+index <- kmat[,illustration.unit]   # length n
 PC    <- lpca(A=x.full[,-(1:(p/2))], index=index, nlam=5, n=n, K=K0)
 ggplot()+geom_line(data=data.frame(x=1:5, y=PC$sv), aes(x=x,y=y))+
          xlab("Component Number")+ylab("Singular value")+
@@ -156,6 +156,7 @@ baplot <- love.plot(bt, abs = TRUE, shapes = c(16, 17, 15),
                     var.names = c(x1 = "x[-30]", x2 = "x[-29]", x3 ="x[-28]", x4 ="x[-27]", x5 ="x[-26]"))  
 baplot + scale_shape_discrete(name = "Weighting scheme", labels = c("Unadjusted",
                                                                     expression(ps(alpha, z)), expression(ps(z)))) + labs(x = "Absolute standardized mean difference") +
+  guides(size="none", stroke="none", colour="none") +
   theme(
     legend.position = c(0.98, 0.98),   # inside plot (x,y in [0,1])
     legend.justification = c(1, 1),    # anchor at top-right of legend box
@@ -186,22 +187,6 @@ plot <- plot + geom_vline(xintercept = -.5, linetype="dashed", color="black")+ y
                      panel.grid.minor = element_blank(),panel.grid.major = element_blank())
 ggsave("output/fit.pdf", width = 5, height = 4)
 
-##################################################################
-# Plot the result for one firm (NOT longer reported in the paper)
-plot.single <- ggplot()
-plot.fit <- data.frame(y=mat.fit[-(1:10),1], t=-20:1, name="Fit") 
-plot.y   <- data.frame(y=mat.y[-(1:10),1],   t=-20:1, name="Y")
-plot.single <- plot.single + geom_line(data=plot.fit, aes(x=t, y=y, colour=name))
-plot.single <- plot.single + geom_line(data=plot.y,   aes(x=t, y=y, colour=name))
-plot.single <- plot.single + scale_colour_manual(name="", values=c("black","grey"))
-
-plot.single <- plot.single + geom_vline(xintercept = -.5, linetype="dashed", color="black")+ ylim(-.3, .4) +
-               xlab("date") + ylab("return") + 
-               theme_bw() + 
-               theme(legend.position = c(.07,0.15),
-                     legend.background = element_rect(fill="transparent"),
-                     panel.grid.minor = element_blank(),panel.grid.major = element_blank())
-ggsave("output/fit_single.pdf", width = 5, height = 4)
 }
 
 
@@ -209,7 +194,7 @@ ggsave("output/fit_single.pdf", width = 5, height = 4)
 # Step 3: calculate ATT
 
 # ---- Reviewer 4 / Step 3: pre-treatment placebos and broader ATT sensitivities.
-# Trimming removes poorly matched controls only, preserving each sample's treated target.
+# Poor-match trimming preserves treated firms; the score trim changes the treated target.
 if (run.checks) {
   check_placebos(checks)
   check_sensitivity(checks)
@@ -530,4 +515,3 @@ plot <- plot + geom_line(aes(x=x, y=F11, colour="Y(1)|D=1", linetype="Y(1)|D=1")
                      panel.grid.major=element_blank(), panel.grid.minor = element_blank())
 ggsave("output/SD.pdf", width = 6, height=3)
 }
-

@@ -1,0 +1,10 @@
+\begin{tabular}{lccc}
+\hline\hline
+Sample & Covariates & Daily rejections (30) & Cumulative rejections (4) \\
+\hline
+Full & No & 4 & 0 \\
+Full & Yes & 1 & 0 \\
+Base & No & 1 & 0 \\
+Base & Yes & 0 & 0 \\
+\hline
+\end{tabular}

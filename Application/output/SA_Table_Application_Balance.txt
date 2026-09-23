@@ -1,0 +1,10 @@
+\begin{tabular}{llccc}
+\hline\hline
+Sample & Control weights & Log assets & ROE & Leverage \\
+\hline
+Full & Unweighted & 1.328 & 0.588 & 0.096 \\
+Full & Reweighted & 0.195 & 0.111 & 0.303 \\
+Base & Unweighted & 1.056 & 0.704 & 0.492 \\
+Base & Reweighted & 0.393 & 0.088 & 0.064 \\
+\hline
+\end{tabular}

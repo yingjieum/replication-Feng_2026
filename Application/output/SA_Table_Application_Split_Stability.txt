@@ -1,0 +1,14 @@
+\begin{tabular}{llcccc}
+\hline\hline
+& & \multicolumn{2}{c}{Neighbor overlap} & \multicolumn{2}{c}{Loading-space distance} \\
+\cline{3-4}\cline{5-6}
+Sample & Split & Treated & All & Treated & All \\
+\hline
+Full & Swapped halves & 0.398 & 0.398 & 0.260 & 0.367 \\
+Full & Matching 100, PCA 150 & 0.689 & 0.714 & 0.033 & 0.032 \\
+Full & Matching 150, PCA 100 & 0.847 & 0.827 & 0.018 & 0.020 \\
+Base & Swapped halves & 0.429 & 0.408 & 0.289 & 0.569 \\
+Base & Matching 100, PCA 150 & 0.694 & 0.714 & 0.040 & 0.036 \\
+Base & Matching 150, PCA 100 & 0.852 & 0.827 & 0.023 & 0.023 \\
+\hline
+\end{tabular}

@@ -1,0 +1,15 @@
+\begin{tabular}{lcccc}
+\hline\hline
+& \multicolumn{2}{c}{No covariates} & \multicolumn{2}{c}{With covariates} \\
+\cline{2-3}\cline{4-5}
+Specification & Full & Base & Full & Base \\
+\hline
+Benchmark 125/125 & 0.105 (0.028) & 0.087 (0.026) & 0.049 (0.027) & 0.074 (0.032) \\
+Swapped halves & 0.109 (0.028) & 0.099 (0.027) & 0.061 (0.026) & 0.079 (0.026) \\
+Matching 100, PCA 150 & 0.106 (0.028) & 0.093 (0.027) & 0.075 (0.026) & 0.081 (0.027) \\
+Matching 150, PCA 100 & 0.107 (0.028) & 0.086 (0.026) & 0.051 (0.028) & 0.074 (0.029) \\
+Trim top 10\% & 0.101 (0.028) & 0.101 (0.026) & 0.088 (0.027) & 0.091 (0.026) \\
+Trim top 5\% & 0.105 (0.028) & 0.101 (0.026) & 0.081 (0.026) & 0.089 (0.026) \\
+Propensity trim $>0.9$ & -- & -- & 0.048 (0.028) & 0.061 (0.032) \\
+\hline
+\end{tabular}

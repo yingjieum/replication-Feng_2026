@@ -185,7 +185,8 @@ check_write <- function(state, name, tab) {
 }
 
 # Define the exact paper samples, unused outcomes, and blocked proxy splits.
-check_setup <- function(data, x, y, d, z, K, output=Sys.getenv("FENG_CHECK_OUTPUT", "output/check-r4-revised")) {
+check_setup <- function(data, x, y, d, z, K,
+                        output=Sys.getenv("FENG_CHECK_OUTPUT", "output/intermediate/application-diagnostics")) {
   state <- new.env(parent=emptyenv())
   state$output <- output
   dir.create(output, showWarnings=FALSE, recursive=TRUE)
@@ -454,9 +455,9 @@ check_prediction_design <- function(state,s,nm,design,matching,pca,target,contro
 }
 
 check_heldout <- function(state) {
-  # Ordered, disjoint groups with ten unused dates between adjacent groups.
-  designs <- list(chronological_gap10=list(match=1:80,pca=91:165,hold=176:250),
-    reversed_gap10=list(match=171:250,pca=86:160,hold=1:75))
+  # All proxy dates enter three disjoint, contiguous groups; the ATT estimator is unchanged.
+  designs <- list(chronological_gapless=list(match=1:100,pca=101:200,hold=201:250),
+    reversed_gapless=list(match=151:250,pca=51:150,hold=1:50))
   tabs <- definitions <- outcome <- list()
   for (nm in names(state$samples)) {
     s <- state$samples[[nm]]
@@ -464,7 +465,9 @@ check_heldout <- function(state) {
       cols <- designs[[name]]
       stopifnot(all(vapply(cols,function(v) all(diff(v)==1),logical(1))),
         !length(intersect(cols$match,cols$pca)),!length(intersect(cols$match,cols$hold)),
-        !length(intersect(cols$pca,cols$hold)))
+        !length(intersect(cols$pca,cols$hold)),
+        length(cols$match)==100L,length(cols$pca)==100L,length(cols$hold)==50L,
+        identical(sort(unlist(cols,use.names=FALSE)),seq_len(ncol(s$x))))
       definitions[[paste(nm,name)]] <- do.call(rbind,lapply(names(cols),function(g)
         data.frame(sample=nm,design=name,group=g,proxy=cols[[g]],event_day=cols[[g]]-281)))
       message("Reviewer 4 prediction: ",nm," / ",name)
@@ -556,7 +559,7 @@ check_placebos <- function(state) {
   invisible(state)
 }
 
-# Step 3: broaden sensitivities while retaining every treated unit in trimming exercises.
+# Step 3: broaden sensitivities, distinguishing control and treated-score trimming.
 check_sensitivity <- function(state) {
   # R4-requested choices at fixed K: dimension rules, distances, ordered splits, trimming.
   specs <- list(benchmark=list(),threshold075=list(multiplier=.75),threshold125=list(multiplier=1.25),
@@ -564,6 +567,32 @@ check_sensitivity <- function(state) {
     reversed=list(split="reversed"),boundary100=list(split="boundary100"),boundary150=list(split="boundary150"),
     trim90=list(trim=.9),trim95=list(trim=.95))
   rows <- list()
+  summarize_fit <- function(nm, specification, covariates, s, fit,
+                            dropped_controls=0L, dropped_treated=0L) {
+    stat <- check_att(s$y[,1],s$d,fit$yfit[,1],fit$ps)
+    ctrl <- s$d==0; treated <- !ctrl
+    w <- fit$ps[ctrl]/(1-fit$ps[ctrl])
+    lo <- min(fit$ps[ctrl]); hi <- max(fit$ps[ctrl])
+    data.frame(sample=nm,specification=specification,covariates=covariates,
+      n=length(s$d),treated=sum(s$d),dropped_controls=dropped_controls,
+      dropped_treated=dropped_treated,K=state$K,
+      att=stat$att,se=stat$se,lower=stat$att-1.96*stat$se,
+      upper=stat$att+1.96*stat$se,
+      treated_ps_mean=mean(fit$ps[treated]),treated_ps_min=min(fit$ps[treated]),
+      treated_ps_max=max(fit$ps[treated]),control_ps_mean=mean(fit$ps[ctrl]),
+      control_ps_min=lo,control_ps_max=hi,
+      treated_outside_control_range=sum(fit$ps[treated]<lo | fit$ps[treated]>hi),
+      control_ESS=sum(w)^2/sum(w^2),max_control_weight=max(w),
+      nonconverged=sum(!fit$records$converged),
+      nonconverged_treated=sum(!fit$records$converged[treated]),
+      rank_deficient=sum(fit$records$outcome_rank<fit$records$parameters |
+                         fit$records$logit_rank<fit$records$parameters),
+      nonfinite_predictions=sum(!is.finite(fit$yfit[,1])),
+      nonfinite_scores=sum(!is.finite(fit$ps)),
+      near_one_control_score=sum(fit$ps[ctrl]>1-1e-8),
+      logit_warning_count=sum(nzchar(fit$records$logit_warning)),
+      mean_dimension=mean(fit$records$dimension))
+  }
   for (nm in names(state$samples)) {
     original <- state$samples[[nm]]
     for (spec in names(specs)) {
@@ -580,19 +609,21 @@ check_sensitivity <- function(state) {
       for (cov in c(FALSE,TRUE)) {
         fit <- if(spec=="benchmark") state$baseline[[paste(nm,cov,sep="|")]] else
           do.call(check_fit,c(list(state=state,s=s,tag=tag,covariates=cov),options))
-        stat <- check_att(s$y[,1],s$d,fit$yfit[,1],fit$ps)
-        ctrl <- s$d==0; w <- fit$ps[ctrl]/(1-fit$ps[ctrl])
-        rows[[paste(nm,spec,cov)]] <- data.frame(sample=nm,specification=spec,covariates=cov,
-          n=length(s$d),treated=sum(s$d),dropped_controls=dropped,K=state$K,
-          att=stat$att,se=stat$se,lower=stat$att-1.96*stat$se,upper=stat$att+1.96*stat$se,
-          control_ESS=sum(w)^2/sum(w^2),max_control_weight=max(w),
-          nonconverged=sum(!fit$records$converged),nonconverged_treated=sum(!fit$records$converged[s$d==1]),
-          rank_deficient=sum(fit$records$outcome_rank<fit$records$parameters | fit$records$logit_rank<fit$records$parameters),
-          nonfinite_predictions=sum(!is.finite(fit$yfit[,1])),nonfinite_scores=sum(!is.finite(fit$ps)),
-          near_one_control_score=sum(fit$ps[ctrl]>1-1e-8),
-          logit_warning_count=sum(nzchar(fit$records$logit_warning)),mean_dimension=mean(fit$records$dimension))
+        rows[[paste(nm,spec,cov)]] <- summarize_fit(nm,spec,cov,s,fit,
+          dropped_controls=dropped)
       }
     }
+    # The SA also reports a treated-score sensitivity: remove benchmark-treated
+    # firms with a covariate-adjusted propensity above 0.9, then refit everything.
+    baseline <- state$baseline[[paste(nm,TRUE,sep="|")]]
+    drop <- original$d==1 & baseline$ps>.9
+    stopifnot(sum(drop)==1L)
+    keep <- !drop
+    trimmed <- lapply(original,function(v)
+      if(is.null(dim(v))) v[keep] else v[keep,,drop=FALSE])
+    fit <- check_fit(state,trimmed,paste0(nm,"_propensity_trim09"),covariates=TRUE)
+    rows[[paste(nm,"propensity_trim09",TRUE)]] <- summarize_fit(
+      nm,"propensity_trim09",TRUE,trimmed,fit,dropped_treated=sum(drop))
   }
   check_write(state,"sensitivity",do.call(rbind,rows))
   invisible(state)
@@ -642,7 +673,7 @@ check_figures <- function(state,only=NULL) {
       v <- subset(state$tables[["prediction-gains"]],sample==nm & group=="treated")
       ratios <- cbind(Linear=v$factor_controls_mse/v$covariates_linear_mse,KNN=v$factor_controls_mse/v$covariates_knn_mse)
       matplot(1:2,ratios,pch=c(16,17),type="b",col=c("black","gray50"),xaxt="n",xlim=c(.7,2.3),ylim=range(c(1,ratios)),ylab="MSE ratio: PCA + controls / covariates",xlab="",main=paste(nm,"treated-firm proxy prediction"))
-      axis(1,1:2,c("Later: [-105,-31]","Earlier: [-280,-206]"));abline(h=1,lty=2);legend("center",c("Covariate linear","Covariate KNN"),pch=c(16,17),col=c("black","gray50"),bty="n",cex=.75)
+      axis(1,1:2,c("Later: [-80,-31]","Earlier: [-280,-231]"));abline(h=1,lty=2);legend("center",c("Covariate linear","Covariate KNN"),pch=c(16,17),col=c("black","gray50"),bty="n",cex=.75)
     }
     for(nm in names(state$samples)) {
       v <- subset(state$tables[["outcome-gains"]],sample==nm)
@@ -706,11 +737,12 @@ check_prediction_summary <- function(tab,outcome=FALSE) {
 check_report <- function(state) {
   check_write(state,"prediction-gains",check_prediction_summary(state$tables[["heldout-prediction"]]))
   check_write(state,"outcome-gains",check_prediction_summary(state$tables[["outcome-prediction"]],TRUE))
-  # Author-requested reporting focus; reuse the existing latest prediction block.
-  focus <- subset(state$tables[["prediction-gains"]],design=="chronological_gap10" & group=="treated")
-  focus$prediction_first_day <- -105L
+  # Author-requested reporting focus on the later block of the gapless design.
+  focus <- subset(state$tables[["prediction-gains"]],design=="chronological_gapless" & group=="treated")
+  focus$prediction_first_day <- -80L
   focus$prediction_last_day <- -31L
-  focus$prediction_days <- 75L
+  focus$prediction_days <- 50L
+  stopifnot(nrow(focus)==length(state$samples),all(focus$prediction_days==50L))
   check_write(state,"treated-proxy-focus",focus)
   tabs <- state$tables
   summary <- do.call(rbind,lapply(names(state$samples),function(nm) {
@@ -726,8 +758,8 @@ check_report <- function(state) {
       significant_daily_preoutcomes_with_controls=sum(pre$covariates & pre$p_family_adjusted<.05))
   }))
   check_write(state,"summary",summary)
-  lines <- c("# Revised Reviewer 4 empirical checks","",
-    "Run from Application/: `FENG_CHECKS_ONLY=1 Rscript --vanilla Feng-2026_Illustration.R`. Results are provisional review materials. See [the request correspondence](check-r4-correspondence.md) for the direct response to each R4 request.","",
+  lines <- c("# Empirical diagnostic audit","",
+    "Run from Application/: `FENG_CHECKS_ONLY=1 Rscript --vanilla Feng-2026_Illustration.R`. These intermediate files provide the numerical provenance for the application results reported in the paper and supplement.","",
     "The original full/base samples, CAR[0,1], K=99, controls, dimension threshold, intercepts and proxy window [-280,-31] are preserved. No new K grid or forced fixed-factor experiment is included.","",
     "## Benchmark and local signals","",
     "| Sample | Firms / treated | Selected dimensions 1 / 2 | ATT without controls (SE) | ATT with controls (SE) |","| --- | ---: | ---: | ---: | ---: |")
@@ -748,17 +780,17 @@ check_report <- function(state) {
       lines <- c(lines,sprintf("- %s, %s controls: ATT across the %d requested specifications ranges %.4f-%.4f; %d nominal 95%% intervals exclude zero. Specifications with nonfinite ATT/SE or control scores above 1-1e-8: %d (full results retained in CSV).",nm,if(cov)"with" else "without",nrow(v),min(v$att[good]),max(v$att[good]),sum(v$lower[good]>0 | v$upper[good]<0),sum(!good)))
     }
   }
-  lines <- c(lines,"","Threshold multipliers 0.75/1.25, the two alternative manuscript distances, and 90th/95th-percentile poor-match control trimming supplement split sensitivity. Trimming retains every treated firm and recomputes neighborhoods and nuisances. These are illustrative sensitivity comparisons, not evidence that every alternative distance meets the identifying assumptions.","",
+  lines <- c(lines,"","Threshold multipliers 0.75/1.25, the two alternative manuscript distances, and 90th/95th-percentile poor-match control trimming supplement split sensitivity. Poor-match trimming retains every treated firm. The separate propensity-score check drops the one treated firm above 0.9 in each benchmark sample. Each trim recomputes neighborhoods and nuisances. These are illustrative sensitivity comparisons, not evidence that every alternative distance meets the identifying assumptions.","",
     "## Prediction beyond observed covariates","",
-    "Five-fold held-out prediction compares local PCA plus the same controls with (i) covariate-only linear regression and (ii) K=99 nearest-neighbor means using standardized observed covariates alone. Covariate-only models never use proxy-based neighborhoods. PCA and regressions exclude the entire test fold. Proxy groups are disjoint chronological blocks with ten unused dates between adjacent groups.","",
+    "Five-fold held-out prediction compares local PCA plus the same controls with (i) covariate-only linear regression and (ii) K=99 nearest-neighbor means using standardized observed covariates alone. Covariate-only models never use proxy-based neighborhoods. PCA and regressions exclude the entire test fold. The three proxy groups are disjoint contiguous chronological blocks and use all 250 dates.","",
     "A positive MSE gain means improvement over that covariate-only comparator; a negative gain means higher prediction error. These are descriptive gains, without significance claims.","",
-    "The author-requested focus is treated firms in the latest existing prediction block, days [-105,-31]. This is relevant to the ATT target population and uses returns closer to treatment. Matching uses [-280,-201], PCA uses [-190,-116], and the last 30 pre-event days remain excluded. Each prediction date has its own regression; MSE averages squared errors over the 75 dates and treated firms, rather than summing returns into a CAR.","",
+    "The author-requested focus is treated firms in the later prediction block, days [-80,-31]. This is relevant to the ATT target population and uses returns closer to treatment. Matching uses [-280,-181], PCA uses [-180,-81], and the last 30 pre-event days remain excluded. Each prediction date has its own regression; MSE averages squared errors over the 50 dates and treated firms, rather than summing returns into a CAR.","",
     "| Sample | Treated firms | Prediction days | MSE gain vs covariate linear | MSE gain vs covariate KNN |","| --- | ---: | --- | ---: | ---: |")
   for(i in seq_len(nrow(focus))) {
     v <- focus[i,]
-    lines <- c(lines,sprintf("| %s | %d | [-105,-31] | %.2f%% | %.2f%% |",v$sample,v$units,v$gain_vs_covariates_linear,v$gain_vs_covariates_knn))
+    lines <- c(lines,sprintf("| %s | %d | [-80,-31] | %.2f%% | %.2f%% |",v$sample,v$units,v$gain_vs_covariates_linear,v$gain_vs_covariates_knn))
   }
-  lines <- c(lines,"","This focus was requested after reviewing the initial pooled results; dates, folds, K and model settings were not changed or searched. Gains are larger against linear regression and smaller against covariate KNN. [Treated-focus CSV](check-treated-proxy-focus.csv) records absolute MSEs and sample/date definitions. The earlier-block treated comparison is mixed against KNN and remains in the prediction CSV and figure as supporting evidence.","",
+  lines <- c(lines,"","The later-block focus and the gapless 100/100/50 allocation were requested after reviewing the earlier packet, before these new gains were computed. Folds, K and model settings were preserved; no alternative windows were searched. [Treated-focus CSV](check-treated-proxy-focus.csv) records absolute MSEs and sample/date definitions. The reversed-block treated and all-firm results remain in the prediction CSV and figure regardless of sign.","",
     "All-firm averages remain supporting comparisons:","",
     "| Sample | Held-out design | MSE gain vs covariate linear | MSE gain vs covariate KNN |","| --- | --- | ---: | ---: |")
   for(i in which(tabs[["prediction-gains"]]$group=="all")) {
@@ -798,75 +830,280 @@ check_report <- function(state) {
   }
   lines <- c(lines,"","No cumulative window rejects at 5% in the current results. Nonrejection is not proof of no pre-event differences.","",
     "## Outputs and interpretation","",
-    "The correspondence table provides short answers and identifies existing manuscript material for requests not requiring new empirical checks. The examples assess observed stability and fit; they do not directly verify latent assumptions. Main-paper and reply sources await author review and integration.","",
+    "The examples assess observed stability and fit; they do not directly verify latent assumptions. The paper-ready tables and figures are written to the parent `output/` directory.","",
     "Entry inputs and IDs: check-samples.csv / check-results.rds. Main tables: check-summary.csv, check-sensitivity.csv, check-treated-proxy-focus.csv, check-prediction-gains.csv, check-outcome-gains.csv, check-overlap.csv, check-balance.csv, check-placebos.csv. Geometry: check-neighborhoods.csv, check-signals.csv, check-dimensions.csv, check-factor-space.csv, check-split-stability.csv. Seven PNGs visualize these results. check-local-fits.csv records numerical warnings. check-sessionInfo.txt records package/platform dependence.","",
     "Seeds retained: 20260917 for five unit folds and 20260916 for 1,999 independent-unit Gaussian multipliers. Proxy splits are deterministic. Multipliers use the existing influence-function formula without refitting nuisances; the inference does not establish cross-unit independence. No package installation or estimator regularization was performed.")
   writeLines(lines,file.path(state$output,"check-report.md"))
-  check_correspondence(state)
   invisible(summary)
-}
-
-check_correspondence <- function(state) {
-  lines <- c("# Reviewer 4: request-by-request correspondence","",
-    "This table maps the current illustrative empirical checks and existing manuscript revisions to R4's report. It is a working response plan, not a replacement for Replies.tex. Several requests share the same check. All cited output files are in this directory; manuscript paths below are relative to the replication-project root.","",
-    "Source: ../submission_CI/REStat/Round 3/decision/RESTAT MS30336-2 R4 report.pdf, report pages 3-10. See [the concise results](check-report.md) and [the revised plan](../../R4_EMPIRICAL_CHECKS_PLAN.md).","",
-    "## Empirical requests","",
-    "| R4 request | Check or existing evidence | How this answers the request |","| --- | --- | --- |",
-    "| 2.2, item 1: split-proxy neighbor and factor-space stability | check-split-stability.csv; check-factor-space.csv; split rows in check-sensitivity.csv | Compare chronological block splits, center-excluded neighbor overlap and rotation-invariant projections on fixed neighborhoods; show resulting ATT. Random column splitting is replaced by contiguous blocks to respect return ordering. |",
-    "| 2.2, item 2: predict held-out proxies from local factors | check-treated-proxy-focus.csv; check-heldout-prediction.csv; check-prediction-gains.csv | Focus on treated firms in days [-105,-31], the latest existing prediction block, to illustrate fit for the ATT target population. Test-fold firms are excluded from PCA/regressions; compare PCA plus controls with covariate-only linear/KNN prediction. Retain all-firm/earlier-block results and the secondary neighbor-mean decomposition. |",
-    "| 2.2, item 3: local eigenvalues and selected dimensions across all units | check-signals.csv; check-dimensions.csv; check-signals.png | Complete local singular spectra, normalized eigenvalues, selection-threshold ratios, and dimension frequencies for every center. State the threshold's heuristic interpretation. |",
-    "| 2.2, item 4: maximum matching discrepancies, especially treated firms | check-neighborhoods.csv; check-matching.png | Report normalized maximum distances and treatment-cell counts by center status; neighborhoods retain K=99 total firms. |",
-    "| 2.2, item 5: propensity overlap and adjusted balance | check-overlap.csv; check-balance.csv; check-overlap.png | Show treated/control score distributions, upper-tail control weights and ESS, plus standardized differences in controls and unused returns. Ignore near-zero control scores as ATT failures. |",
-    "| 2.2, item 6: pre-treatment outcomes or fake dates | check-placebos.csv; check-preoutcomes.png | Use the existing daily/cumulative pre-outcomes with joint inference over 34 outcomes. They lie in the pre-period excluded from proxies; interpret anticipation/other news briefly. No fake date is needed because R4 offers alternatives. |",
-    "| 2.2, item 7: sensitivity to K, dimension, distance, split and poor matches | check-sensitivity.csv; existing main-paper ATT table | Retain dimension-threshold, distance, ordered-split and control-trimming sensitivities. Reuse existing broad K sensitivity; no extra K grid or forced large rank. |",
-    "| 2.7, first concern: returns may omit relevant political-connection characteristics | Existing application scope clarification; covariate-only prediction comparisons | Illustrate information beyond observed controls and retain the substantive scope statement. Full proxy coverage is not directly tested; this is a qualified partial empirical answer. |",
-    "| 2.7, second concern: temporal dependence in returns | check-proxy-splits.csv; check-heldout-designs.csv; check-serial-dependence.csv; existing theoretical discussion | Every proxy group remains a contiguous ordered block, with gaps in held-out prediction. Raw-return lag correlations are descriptive context, not recovered measurement-error correlations or a verification of formal weak dependence. |",
-    "| 2.7, third concern: only 22 treated; local cells, overlap and sensitivities | check-neighborhoods.csv; check-overlap.csv; check-balance.csv; check-sensitivity.csv | The same cell/overlap/balance and sensitivity tables answer this application-specific request in full and base samples. |",
-    "| Minor 5: frequencies of selected dimensions | check-dimensions.csv; check-summary.csv | Report frequencies of each selected rank across all centers and separately for treated centers. |",
-    "| Minor 6: eigenvalues across neighborhoods | check-signals.csv; check-signals.png | All-center spectral distributions replace reliance on a single illustrative unit. |",
-    "| Minor 7: broader choices and direct causal context for K=99 | check-sensitivity.csv; check-outcome-gains.csv; existing K-choice remark and ATT table | New checks vary the requested non-K choices. Single-K untreated-outcome validation and local support summaries provide causal context alongside existing tuning/ATT sensitivity. They do not establish a uniquely optimal causal K. |",
-    "| Minor 8: intercept in local QMLE | Explicit intercepts in application pred()/check_fit()/prediction validation and simulation te.stats(); check-verification.txt | Verify existing implementation; use the accepted Example 4.1/supplement explanation to finalize the reply. |","",
-    "## Remaining R4 points: existing answers and editorial preparation","",
-    "| R4 request | Answer or source | Status for this empirical task |","| --- | --- | --- |",
-    "| 2.1: clarify proxy-outcome-treatment compatibility | Main paper Abstract, Introduction, Section 4.1; current prediction illustration | Accepted substantive clarification already exists. Prediction is supporting observed evidence, not a new identification claim. |",
-    "| 2.2: systematic applicability and diagnostic discussion | Main-paper unnumbered discussion; empirical table above | Discussion is drafted; verified outputs are ready for a concise supplement/reply insertion after review. |",
-    "| 2.3: distinguish latent information/local subspaces from global function recovery | Main-paper Step 1 and theoretical/literature discussion | Accepted manuscript/reply clarification; no additional empirical check required. |",
-    "| 2.4: clarify cross-proxy aggregation and collective rank | Main-paper Remarks 4.1-4.2 and discussion after Assumption 5 | Accepted explanation; distance and spectral comparisons illustrate implementation without claiming every metric is valid. |",
-    "| 2.5: compare identifying assumptions | Supplement Section SA-2.4 and main-text pointer | Accepted comparison subsection supplies the requested answer. |",
-    "| 2.6: theorem assumptions, truncation and consistency; first-stage mapping, Hessian/local cells, no-cross-fitting, correlated-error scope and uniform inference | SUPPLEMENT_TECHNICAL_AUDIT.md; current paper/supplement proofs; Point 2.6 response | All eight technical requests are recorded as addressed/accepted. Empirical cell counts illustrate the local-support issue; no theory source is changed here. |",
-    "| Minor 1: qualify generality/mildness | Accepted Abstract/Introduction and Point 2.1 response | Already answered. |",
-    "| Minor 2: avoid global function/confounder recovery claims | Accepted Step 1 and Point 2.3 response | Already answered. |",
-    "| Minor 3: treatment/time/dimension notation | Current response distinguishes event days, t_i, local rank and treatment indicators | Already answered through notation clarification. |",
-    "| Minor 4: proxy-wise terminology | Current paper/supplement use proxy-wise splitting | Already answered; new split descriptions follow it. |",
-    "| Minor 9: centralized rate/notation summary | Working table below, drawn from supplement assumptions and Theorems SA-4.1/SA-4.2 | A concise answer is prepared in this MD; insertion into supplement/reply remains editorial work. |",
-    "| Minor 10: identifying-assumptions comparison table/subsection | Supplement Section SA-2.4 | Existing accepted short subsection answers the request. |",
-    "| Minor 11: references, including Singh version | Current bibliography and response | Already answered by the accepted reference audit. |",
-    "| Minor 12: absolute-value truncation | Corrected maximal-inequality proof | Already answered. |",
-    "| Minor 13: individual proxy functions need not be monotone | Discussion after Assumption 5 and distance-specific Remark 4.1 | Already answered. |","",
-    "## Working rate/notation summary for Minor 9","",
-    "This is a short editorial aid using existing notation, not an additional theorem or empirical check. Full assumptions remain in the supplement.","",
-    "| Quantity | Meaning / existing condition | Source |","| --- | --- | --- |",
-    "| delta_Kp | min(sqrt(K),sqrt(p)) / sqrt(log(max(n,p))); its inverse enters local estimation error. | SA notation; Theorem SA-4.1 |",
-    "| h_n | Induced latent matching radius. Under equal matching exponents, the oracle part is (K/n)^(1/r_alpha); matching error adds a_p^(1/lower exponent). | Main matching discussion; SA-2.1/SA-2.3 |",
-    "| r_eta,Ni | Maximum entrywise proxy local-approximation remainder. | Assumption SA-3.5 |",
-    "| r_mu,Ni | Maximum local approximation error for potential-outcome functions over the neighborhood and treatment levels. | Assumption SA-3.5 |",
-    "| r_e,Ni | Maximum local approximation error for treatment-index functions over the neighborhood and nonbaseline levels. | Assumption SA-3.5 |",
-    "| m_p | Conditional-mean bias from proxy/equation-error dependence; zero under the main-paper independence condition. | SA-2.1; SA-3; Theorem SA-4.1 |",
-    "| Finite-moment restriction | (np)^(2/nu) delta_Kp^(-2) remains bounded, where nu is the assumed error-moment order. | Theorems SA-4.1/SA-4.2 |",
-    "| Local estimation | Outcome error has uniform order delta_Kp^(-1)+r_eta,Ni+r_mu,Ni+m_p; treatment error replaces r_mu,Ni by r_e,Ni. | Theorem SA-4.1 |",
-    "| Pointwise causal rate | sqrt(n log n) times [delta_Kp^(-2)+m_p^2+sample mean of (r_mu,Ni^2+r_e,Ni^2+r_eta,Ni^2)] tends to zero in probability, with the theorem's finite-moment restriction. | Theorem SA-4.2 |","",
-    "No new K selection, forced-factor specification, fake treatment date, identification test, or manuscript edit is needed to generate this correspondence. Keep findings concise and report all retained checks honestly, including negative prediction gains and significant pre-outcomes.")
-  writeLines(lines,file.path(state$output,"check-r4-correspondence.md"))
 }
 
 # Preserve audit inputs, seeds and predictions alongside the revised reports.
 check_finish <- function(state) {
   check_report(state)
   check_figures(state)
+  write_application_outputs(state)
   saveRDS(list(tables=state$tables,baseline=state$baseline,splits=state$splits,
     folds=state$folds,ids=lapply(state$samples,`[[`,"ids"),K=state$K,
     seeds=c(placebos=20260916,unit_folds=20260917)),file.path(state$output,"check-results.rds"))
   writeLines(capture.output(sessionInfo()),file.path(state$output,"check-sessionInfo.txt"))
-  message("Revised Reviewer 4 checks saved under ",state$output)
+  message("Application diagnostics saved under ",state$output)
   invisible(state)
+}
+
+# Write a LaTeX tabular fragment that can be copied directly into the paper input folder.
+application_write_table <- function(output, name, lines) {
+  path <- file.path(output,name)
+  writeLines(lines,path)
+  path
+}
+
+# Recreate the main-paper distribution of the second local singular-value ratio.
+application_figure_singular_ratio <- function(signals, output) {
+  values <- subset(signals,sample=="full" & component==2L)
+  stopifnot(nrow(values)==583L,!anyDuplicated(values$unit),
+    all(is.finite(values$singular_threshold_ratio)),
+    sum(values$singular_threshold_ratio>1)==23L)
+  figure <- ggplot(data.frame(ratio=values$singular_threshold_ratio),aes(x=ratio))+
+    geom_histogram(aes(y=after_stat(count/sum(count))),binwidth=.05,boundary=1,
+      fill="grey80",color="grey35",linewidth=.3)+
+    labs(x="Second singular value / selection threshold",
+      y="Fraction of neighborhoods")+
+    theme_bw()+theme(panel.grid.minor=element_blank())
+  path <- file.path(output,"singular_ratio_full.pdf")
+  ggsave(path,figure,width=5,height=3,device="pdf",useDingbats=FALSE)
+  path
+}
+
+# Recreate the supplemental matching-discrepancy distributions for both samples.
+application_figure_matching <- function(neighborhoods, output) {
+  neighborhoods <- subset(neighborhoods,sample %in% c("full","base") &
+    split=="benchmark" & distance=="pseudo-max" & K==99)
+  get_values <- function(sample,treated_only) {
+    x <- neighborhoods[neighborhoods$sample==sample,]
+    expected <- if(sample=="full") 583L else 526L
+    stopifnot(nrow(x)==expected,!anyDuplicated(x$unit),
+      all(x$treated %in% 0:1),all(is.finite(x$normalized_max)),
+      all(x$normalized_max>=0))
+    if(treated_only) {
+      x <- x[x$treated==1,]
+      stopifnot(nrow(x)==if(sample=="full") 22L else 12L)
+    }
+    x$normalized_max
+  }
+  samples <- c("full","base"); columns <- c("All firms","Treated firms")
+  values <- lapply(c(FALSE,TRUE),function(treated_only)
+    lapply(samples,get_values,treated_only=treated_only))
+  breaks <- list(pretty(range(unlist(values[[1]])),n=20),
+    pretty(range(unlist(values[[2]])),n=8))
+  heights <- lapply(seq_along(breaks),function(column)
+    max(unlist(lapply(values[[column]],function(x)
+      hist(x,breaks=breaks[[column]],plot=FALSE)$density))))
+  path <- file.path(output,"matching_discrepancy_dist.pdf")
+  pdf(path,width=6.6,height=4.2,useDingbats=FALSE)
+  tryCatch({
+    par(mfrow=c(2,2),mar=c(3,3.5,1.6,.6),mgp=c(2,.6,0),
+      cex.axis=.8,cex.lab=.85,cex.main=.9)
+    for(row in seq_along(samples)) for(column in seq_along(columns)) {
+      x <- values[[column]][[row]]
+      hist(x,breaks=breaks[[column]],freq=FALSE,xlim=range(breaks[[column]]),
+        ylim=c(0,1.06*heights[[column]]),col="gray75",border="black",
+        xlab="Normalized maximum discrepancy",ylab="Density",
+        main=sprintf("%s: %s (n=%d)",if(row==1L) "Full" else "Base",
+          columns[[column]],length(x)))
+    }
+  },finally=dev.off())
+  path
+}
+
+# Recreate the supplemental distributions of the first two local eigenvalue ratios.
+application_figure_eigen_ratios <- function(signals, output) {
+  path <- file.path(output,"eigen_ratio_dist.pdf")
+  pdf(path,width=6.6,height=2.7,useDingbats=FALSE)
+  tryCatch({
+    par(mfrow=c(1,2),mar=c(3.1,3.5,1.7,.6),mgp=c(2,.6,0),
+      cex.axis=.85,cex.lab=.9,cex.main=.9)
+    for(component in 1:2) {
+      values <- lapply(c("full","base"),function(sample) {
+        x <- signals[signals$sample==sample & signals$component==component,]
+        expected <- if(sample=="full") 583L else 526L
+        stopifnot(nrow(x)==expected,all(is.finite(x$eigen_threshold_ratio)),
+          !anyDuplicated(x$unit))
+        x$eigen_threshold_ratio
+      })
+      breaks <- pretty(range(c(unlist(values),1)),n=if(component==1L) 22 else 18)
+      full_hist <- hist(values[[1]],breaks=breaks,plot=FALSE)
+      base_hist <- hist(values[[2]],breaks=breaks,plot=FALSE)
+      hist(values[[1]],breaks=breaks,freq=FALSE,xlim=range(breaks),
+        ylim=c(0,1.08*max(full_hist$density,base_hist$density)),
+        col="gray80",border="gray55",xlab="Eigenvalue ratio",ylab="Density",
+        main=if(component==1L) "First eigenvalue ratio" else "Second eigenvalue ratio")
+      hist(values[[2]],breaks=breaks,freq=FALSE,add=TRUE,
+        col=NA,border="black",lwd=1.2)
+      legend("topright",c("Full","Base"),fill=c("gray80",NA),
+        border=c("gray55","black"),bty="n",cex=.75)
+    }
+  },finally=dev.off())
+  path
+}
+
+# Export every empirical table and figure currently reported in the paper or supplement.
+write_application_outputs <- function(state, output="output") {
+  dir.create(output,showWarnings=FALSE,recursive=TRUE)
+  tabs <- state$tables
+  required <- c("sensitivity","split-stability","factor-space","prediction-gains",
+    "outcome-gains","placebos","dimensions","signals","balance","neighborhoods")
+  stopifnot(all(required %in% names(tabs)))
+  files <- c(
+    application_figure_singular_ratio(tabs$signals,output),
+    application_figure_matching(tabs$neighborhoods,output),
+    application_figure_eigen_ratios(tabs$signals,output))
+
+  # Sensitivity to proxy splitting, poor-match trimming, and high treated scores.
+  sensitivity <- tabs$sensitivity
+  pick_sensitivity <- function(sample_name,spec,with_covariates)
+    sensitivity[sensitivity$sample==sample_name & sensitivity$specification==spec &
+      sensitivity$covariates==with_covariates,]
+  specs <- c("benchmark","reversed","boundary100","boundary150","trim90","trim95")
+  labels <- c("Benchmark 125/125","Swapped halves","Matching 100, PCA 150",
+    "Matching 150, PCA 100","Trim top 10\\%","Trim top 5\\%")
+  rows <- vapply(seq_along(specs),function(i) {
+    v <- lapply(c("full","base"),function(sample)
+      lapply(c(FALSE,TRUE),function(covariates) {
+        x <- pick_sensitivity(sample,specs[i],covariates)
+        stopifnot(nrow(x)==1L)
+        sprintf("%.3f (%.3f)",x$att,x$se)
+      }))
+    sprintf("%s & %s & %s & %s & %s \\\\",labels[i],v[[1]][[1]],v[[2]][[1]],
+      v[[1]][[2]],v[[2]][[2]])
+  },character(1))
+  ps <- lapply(c("full","base"),function(sample) {
+    x <- pick_sensitivity(sample,"propensity_trim09",TRUE)
+    stopifnot(nrow(x)==1L,x$dropped_treated==1L)
+    sprintf("%.3f (%.3f)",x$att,x$se)
+  })
+  rows <- c(rows,sprintf("Propensity trim $>0.9$ & -- & -- & %s & %s \\\\",ps[[1]],ps[[2]]))
+  files <- c(files,application_write_table(output,"SA_Table_Application_Sensitivity.txt",c(
+    "\\begin{tabular}{lcccc}","\\hline\\hline",
+    "& \\multicolumn{2}{c}{No covariates} & \\multicolumn{2}{c}{With covariates} \\\\",
+    "\\cline{2-3}\\cline{4-5}","Specification & Full & Base & Full & Base \\\\",
+    "\\hline",rows,"\\hline","\\end{tabular}")))
+
+  # Neighbor and loading-space stability across ordered proxy splits.
+  overlap <- tabs[["split-stability"]]; spaces <- tabs[["factor-space"]]
+  stability_value <- function(tab,sample,split,treated,value) {
+    keep <- tab$sample==sample & tab$split==split
+    if(treated) keep <- keep & tab$treated==1
+    median(tab[[value]][keep])
+  }
+  split_names <- c(reversed="Swapped halves",boundary100="Matching 100, PCA 150",
+    boundary150="Matching 150, PCA 100")
+  rows <- unlist(lapply(c("full","base"),function(sample)
+    vapply(names(split_names),function(split) sprintf(
+      "%s & %s & %.3f & %.3f & %.3f & %.3f \\\\",
+      if(sample=="full") "Full" else "Base",split_names[[split]],
+      stability_value(overlap,sample,split,TRUE,"overlap_fraction"),
+      stability_value(overlap,sample,split,FALSE,"overlap_fraction"),
+      stability_value(spaces,sample,split,TRUE,"projection_distance"),
+      stability_value(spaces,sample,split,FALSE,"projection_distance")),character(1))))
+  files <- c(files,application_write_table(output,"SA_Table_Application_Split_Stability.txt",c(
+    "\\begin{tabular}{llcccc}","\\hline\\hline",
+    "& & \\multicolumn{2}{c}{Neighbor overlap} & \\multicolumn{2}{c}{Loading-space distance} \\\\",
+    "\\cline{3-4}\\cline{5-6}",
+    "Sample & Split & Treated & All & Treated & All \\\\","\\hline",rows,
+    "\\hline","\\end{tabular}")))
+
+  # Held-out proxy and untreated-event prediction gains.
+  proxy <- subset(tabs[["prediction-gains"]],design=="chronological_gapless" & group=="treated")
+  event <- tabs[["outcome-gains"]]
+  stopifnot(nrow(proxy)==2L,nrow(event)==2L)
+  rows <- c(vapply(c("full","base"),function(sample) {
+      x <- proxy[proxy$sample==sample,]
+      sprintf("%s & Treated daily proxies & %d & %.2f & %.2f \\\\",
+        if(sample=="full") "Full" else "Base",x$units,
+        x$gain_vs_covariates_linear,x$gain_vs_covariates_knn)
+    },character(1)),vapply(c("full","base"),function(sample) {
+      x <- event[event$sample==sample,]
+      sprintf("%s & Untreated CAR[0,1] & %d & %.2f & %.2f \\\\",
+        if(sample=="full") "Full" else "Base",x$units,
+        x$gain_vs_covariates_linear,x$gain_vs_covariates_knn)
+    },character(1)))
+  files <- c(files,application_write_table(output,"SA_Table_Application_Prediction.txt",c(
+    "\\begin{tabular}{llrcc}","\\hline\\hline",
+    "Sample & Prediction target & Firms & Linear gain (\\%) & $K$-NN gain (\\%) \\\\",
+    "\\hline",rows,"\\hline","\\end{tabular}")))
+
+  # Simultaneously adjusted pre-event outcome checks.
+  rows <- unlist(lapply(c("full","base"),function(sample)
+    vapply(c(FALSE,TRUE),function(covariates) {
+      x <- tabs$placebos[tabs$placebos$sample==sample &
+        tabs$placebos$covariates==covariates,]
+      sprintf("%s & %s & %d & %d \\\\",if(sample=="full") "Full" else "Base",
+        if(covariates) "Yes" else "No",
+        sum(grepl("^day",x$outcome) & x$p_family_adjusted<.05),
+        sum(!grepl("^day",x$outcome) & x$p_family_adjusted<.05))
+    },character(1))))
+  files <- c(files,application_write_table(output,"SA_Table_Application_Placebos.txt",c(
+    "\\begin{tabular}{lccc}","\\hline\\hline",
+    "Sample & Covariates & Daily rejections (30) & Cumulative rejections (4) \\\\",
+    "\\hline",rows,"\\hline","\\end{tabular}")))
+
+  # Selected dimensions and quartiles of the first two signal ratios.
+  rows <- vapply(c("full","base"),function(sample) {
+    dims <- tabs$dimensions[tabs$dimensions$sample==sample,]
+    ratios <- vapply(1:2,function(component) {
+      x <- tabs$signals$eigen_threshold_ratio[tabs$signals$sample==sample &
+        tabs$signals$component==component]
+      paste(sprintf("%.2f",quantile(x,c(.25,.5,.75),names=FALSE)),collapse=" / ")
+    },character(1))
+    sprintf("%s & %d & %d & %s & %s \\\\",if(sample=="full") "Full" else "Base",
+      sum(dims$selected_dimension==1),sum(dims$selected_dimension==2),ratios[1],ratios[2])
+  },character(1))
+  files <- c(files,application_write_table(output,"SA_Table_Application_Signals.txt",c(
+    "\\begin{tabular}{lcccc}","\\hline\\hline",
+    "Sample & $\\ttd_i=1$ & $\\ttd_i=2$ & First eigenvalue ratio & Second eigenvalue ratio \\\\",
+    "\\hline",rows,"\\hline","\\end{tabular}")))
+
+  # Absolute standardized differences for the three observed covariates.
+  variables <- c("Log assets","ROE","Leverage")
+  rows <- unlist(lapply(c("full","base"),function(sample)
+    vapply(c("Unadjusted","Local.PCA.with.controls"),function(scheme) {
+      x <- tabs$balance[tabs$balance$sample==sample & tabs$balance$scheme==scheme &
+        tabs$balance$variable %in% variables,]
+      x <- x[match(variables,x$variable),]
+      stopifnot(nrow(x)==3L)
+      sprintf("%s & %s & %.3f & %.3f & %.3f \\\\",
+        if(sample=="full") "Full" else "Base",
+        if(scheme=="Unadjusted") "Unweighted" else "Reweighted",abs(x$smd[1]),
+        abs(x$smd[2]),abs(x$smd[3]))
+    },character(1))))
+  files <- c(files,application_write_table(output,"SA_Table_Application_Balance.txt",c(
+    "\\begin{tabular}{llccc}","\\hline\\hline",
+    "Sample & Control weights & Log assets & ROE & Leverage \\\\","\\hline",rows,
+    "\\hline","\\end{tabular}")))
+
+  # ATT-relevant propensity summaries before and after 5-percent poor-match trimming.
+  ps_range <- function(mean,min,max,control=FALSE) {
+    lo <- if(control && min<.001) "$<0.001$" else sprintf("%.3f",min)
+    hi <- if(max>.999) "$>0.999$" else sprintf("%.3f",max)
+    sprintf("%.3f (%s, %s)",mean,lo,hi)
+  }
+  rows <- unlist(lapply(c("benchmark","trim95"),function(spec)
+    vapply(c("full","base"),function(sample) {
+      x <- pick_sensitivity(sample,spec,TRUE)
+      stopifnot(nrow(x)==1L)
+      label <- if(spec=="benchmark") {
+        if(sample=="full") "Full" else "Base"
+      } else sprintf("Trim 5\\%%, %s",sample)
+      sprintf("%s & %s & %s & %d/%d & %.1f \\\\",label,
+        ps_range(x$treated_ps_mean,x$treated_ps_min,x$treated_ps_max),
+        ps_range(x$control_ps_mean,x$control_ps_min,x$control_ps_max,TRUE),
+        x$treated_outside_control_range,x$treated,x$control_ESS)
+    },character(1))))
+  files <- c(files,application_write_table(output,"SA_Table_Application_Overlap.txt",c(
+    "\\begin{tabular}{lcccc}","\\hline\\hline",
+    "& \\multicolumn{2}{c}{Propensity: mean (min, max)} & \\multicolumn{2}{c}{ATT diagnostics} \\\\",
+    "\\cline{2-3}\\cline{4-5}",
+    "Sample & Treated & Controls & Beyond range & Control ESS \\\\","\\hline",rows,
+    "\\hline","\\end{tabular}")))
+  invisible(files)
 }

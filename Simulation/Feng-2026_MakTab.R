@@ -10,7 +10,6 @@ par <- read.csv("Feng-2026_SimModels.csv", header = T, colClasses=c(rep("numeric
 # Table used in the main paper
 ####################################
 mat <- matrix(NA, 9, 7)
-#sum.K <- NULL
 
 for (j in c(2, 31, 32)) {
 n       <- par$n[j]
@@ -56,8 +55,6 @@ CR    <- 1-colMeans(rej)
 AL    <- colMeans(ci)
 #table <- round(rbind(bias, sd, rmse, CR, AL), 3)
 table <- round(rbind(rmse, CR, AL), 3)
-
-sum.K <- rbind(sum.K, c(summary(k.cv), sd(k.cv)))
 
 if (j==31) {         # sig=0.5
   mat[1:3,] <- table
@@ -229,4 +226,3 @@ for (j in 1:30) {
   CR    <- c(CR, 1-colMeans(rej))
 }
 ######
-

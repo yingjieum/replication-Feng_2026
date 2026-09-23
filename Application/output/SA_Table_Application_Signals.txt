@@ -1,0 +1,8 @@
+\begin{tabular}{lcccc}
+\hline\hline
+Sample & $\ttd_i=1$ & $\ttd_i=2$ & First eigenvalue ratio & Second eigenvalue ratio \\
+\hline
+Full & 560 & 23 & 1.46 / 4.59 / 6.85 & 0.62 / 0.77 / 0.88 \\
+Base & 504 & 22 & 1.43 / 2.22 / 5.97 & 0.68 / 0.81 / 0.89 \\
+\hline
+\end{tabular}
