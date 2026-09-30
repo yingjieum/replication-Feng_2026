@@ -404,7 +404,7 @@ colheads <- c("Full Sample", "Base Sample", "Full Sample", "Base Sample")
 cgroup   <- c("No Covariates", "Add Covariates")
 
 n.rgroup <- c(6, 2)
-rgroup   <- c("Local PCA, $K=$", "Double lasso")
+rgroup   <- c("Local PCA, $K=$", "Double Lasso")
 rowname  <- c(Kseq[1], "", Kseq[2], "", Kseq[3], "",  "", "")
 latex(output, file=paste("output/MainPaper_Table_ATT", ".txt", sep = ""), 
       append=FALSE, table.env=FALSE, center="none", title="", col.just=rep("c",4),
@@ -501,14 +501,18 @@ plot.dist <- data.frame(x=eval, F11=F.11, F01=F.01,
                         F01.lb=F01.lb, F01.ub=F01.ub)
 plot.dist <- plot.dist[order(plot.dist$x),]
 plot <- ggplot(data=plot.dist)
-plot <- plot + geom_line(aes(x=x, y=F11, colour="Y(1)|D=1", linetype="Y(1)|D=1")) + 
-               geom_line(aes(x=x, y=F01, colour="Y(0)|D=1", linetype="Y(0)|D=1")) +
+plot <- plot + geom_line(aes(x=x, y=F11, colour="y1", linetype="y1")) +
+               geom_line(aes(x=x, y=F01, colour="y0", linetype="y0")) +
                geom_ribbon(aes(x=x, ymin=F11.lb, ymax=F11.ub), fill="grey70", alpha=.2) +
                geom_ribbon(aes(x=x, ymin=F01.lb, ymax=F01.ub), fill="blue", alpha=.2) +
                scale_color_manual(name = 'CDF', 
-                                  values = c('Y(1)|D=1' = 'black', 'Y(0)|D=1' = 'blue')) +
+                                  breaks = c("y0", "y1"),
+                                  labels = c(expression(y[i](0)~"|"~t[i]==1), expression(y[i](1)~"|"~t[i]==1)),
+                                  values = c('y1' = 'black', 'y0' = 'blue')) +
                scale_linetype_manual(name = 'CDF', 
-                                     values = c('Y(1)|D=1' = 'solid', 'Y(0)|D=1' = 'dashed')) +
+                                     breaks = c("y0", "y1"),
+                                     labels = c(expression(y[i](0)~"|"~t[i]==1), expression(y[i](1)~"|"~t[i]==1)),
+                                     values = c('y1' = 'solid', 'y0' = 'dashed')) +
                xlab("") + ylab("") +theme_bw() + xlim(-0.2, 0.6) +
                theme(legend.position = c(.85, 0.15),
                      legend.background = element_rect(fill="transparent"),
