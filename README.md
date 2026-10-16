@@ -1,12 +1,92 @@
-# Replication: Feng (2026)
+# Replication files for Feng (2026)
 
-Replication files for simulation and empirical illustration in Feng (2026)
+These files reproduce the simulation study and empirical illustration in *Causal Inference in Possibly Nonlinear Factor Models*. Run each script from its own directory because the file paths are relative.
 
-# Reference
+## Software
 
-Feng (2026). [Causal Inference in Possibly Nonlinear Factor Models](https://drive.google.com/file/d/1yu7CwLfofrHO64d2cwvwXknqS0xKmMT2/view?usp=sharing).
-Working Paper.
-[Supplement](https://drive.google.com/file/d/1riyeqX9Vnuj-2aq1bnSeQDvKrCf0zo8b/view?usp=sharing).
+The files were last checked with R 4.3.2 on arm64 macOS. The required packages and checked versions are:
 
-Feng (2026). [Optimal Estimation of Large-Dimensional Nonlinear Factor Models](https://drive.google.com/file/d/1mHQNn-6LNh2tCuroZdFlP31Dt4H6C7O6/view?usp=drive_link).
-Working Paper.
+- `R.matlab` 3.7.0, `Rfast` 2.1.0, `irlba` 2.3.5.1, and `RcppNumerical` 0.6-0
+- `ggplot2` 3.5.2, `reshape2` 1.4.4, `Hmisc` 5.1-2, and `cobalt` 4.5.5
+- `hdm` 0.3.2, `foreach` 1.5.2, `doParallel` 1.0.17, `doRNG` 1.8.6, and `pracma` 2.4.4
+
+## Directory structure
+
+- `Application/` contains the empirical data, the application script, supporting functions, and empirical outputs.
+- `Simulation/` contains the simulation driver, supporting functions, the design file, and reported simulation outputs.
+
+The application and simulation can be run independently.
+
+## Empirical application
+
+### Data
+
+The application uses data from Daron Acemoglu, Simon Johnson, Amir Kermani, James Kwak, and Todd Mitton (2016), “The Value of Connections in Turbulent Times: Evidence from the United States,” *Journal of Financial Economics* 121(2), 368–391. The original study's replication files are available from the [MIT Economics Data Archive](https://economics.mit.edu/people/faculty/daron-acemoglu/data-archive).
+
+`Application/data.mat` is the analysis-ready input. No preprocessing is needed before running the application script. The objects used by the code are:
+
+| Object | Description |
+| --- | --- |
+| `Re` | Daily firm returns. The columns are 583 firms; rows are trading dates. The code uses 250 pre-event returns as proxies and returns on event days 0 and 1 to form CAR[0,1]. |
+| `num` | Firm-level variables. Column 3 records Geithner schedule connections; columns 8–10 are log total assets, return on equity, and total debt divided by total capital in 2008. |
+| `GeiNomDat` | Row index for the November 21, 2008 announcement date. |
+| `CorrCiti` and `CorrCitiTr` | Firm-level correlation with Citigroup and the cutoff used to form the base sample. |
+| `Statadate` | Trading dates, stored as days since January 1, 1960; used in diagnostic records. |
+
+A firm is treated when `num[,3] > 0`. The full sample has 583 firms, including 22 treated firms. The base sample excludes firms whose returns are highly correlated with Citigroup and has 526 firms, including 12 treated firms. The proxy window is event days -280 through -31. Event days -30 through -1 are excluded from the proxies and used for pre-event checks.
+
+### Run the application
+
+From `Application/`, run:
+
+```sh
+Rscript --vanilla Feng-2026_Illustration.R
+```
+
+The script reads `data.mat`, sources `Feng-2026_Illustration_funs.R`, and writes the reported files to `Application/output/`. It uses seed 12345 for distributional inference and seeds 20260916 and 20260917 for the diagnostic calculations.
+
+The reported outputs are:
+
+| Output | Location in the paper or supplement |
+| --- | --- |
+| `MainPaper_Table_ATT.txt` | Main paper, Table 1 |
+| `scree.pdf`, `singular_ratio_full.pdf` | Main paper, Figure 2 |
+| `fit.pdf`, `love_plot.pdf` | Main paper, Figure 3 |
+| `SD.pdf` | Main paper, Figure 4 |
+| `SA_Table_Application_*.txt` | Supplement, Tables SA-1 through SA-8 |
+| `matching_discrepancy_dist.pdf`, `eigen_ratio_dist.pdf` | Supplementary application figures |
+
+The default run also writes supporting diagnostic files under `Application/output/intermediate/application-diagnostics/`. These files record checks and are not manuscript inputs.
+
+## Simulation study
+
+`Feng-2026_SimModels.csv` lists the 44 simulation designs. `Feng-2026_Simulation.R` reads this file, sources `Feng-2026_SimFuns.R`, runs the simulations, and then prepares the reported tables and figure.
+
+From `Simulation/`, run:
+
+```sh
+Rscript --vanilla Feng-2026_Simulation.R
+```
+
+The script uses 2,000 replications for each of the 44 designs and another 2,000 replications for Figure 1. It uses the `doRNG` seed 1234. The number of workers is one fewer than the number of detected cores, with a minimum of one worker. This run is computationally intensive, and its duration depends on the number of available cores.
+
+The script creates two output directories:
+
+- `Simulation/raw-output/` stores the 44 intermediate Monte Carlo result files. This directory is regenerated by the script and is not part of the distributed package.
+- `Simulation/output/` stores the reported files and is included in the package.
+
+The reported outputs are:
+
+| Output | Location in the paper or supplement |
+| --- | --- |
+| `hist_dr_la_lpca.pdf` | Main paper, Figure 1 |
+| `Table_Pointwise_MainPaper.txt` | Main paper, Table 2 |
+| `Table_Pointwise_SA_1.txt` through `Table_Pointwise_SA_9.txt` | Supplement, Tables SA-9 through SA-17 |
+
+Existing files with the same names in either output directory are overwritten when the script is run.
+
+## Paper
+
+Yingjie Feng (2026). [Causal Inference in Possibly Nonlinear Factor Models](https://drive.google.com/file/d/1yu7CwLfofrHO64d2cwvwXknqS0xKmMT2/view?usp=sharing). Working Paper. [Supplement](https://drive.google.com/file/d/1riyeqX9Vnuj-2aq1bnSeQDvKrCf0zo8b/view?usp=sharing).
+
+The local PCA procedure used in the paper builds on Yingjie Feng (2026), [Optimal Estimation of Large-Dimensional Nonlinear Factor Models](https://drive.google.com/file/d/1mHQNn-6LNh2tCuroZdFlP31Dt4H6C7O6/view?usp=drive_link). Working Paper.

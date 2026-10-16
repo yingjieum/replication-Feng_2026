@@ -1,10 +1,10 @@
 #####################################################
 ##### Causal Inference in Nonlinear Factor Models ###
 ############ Empirical Application ##################
-########### Last updated: 09/23/2026 ################
+########### Last updated: 10/15/2026 ################
 #####################################################
-# This file replicates the results in Feng (2026)
-# Data source: Acemoglu et al (JFE, 2016) 
+# This script reproduces the empirical results in Feng (2026).
+# Data source: Acemoglu et al. (Journal of Financial Economics, 2016).
 #####################################################
 rm(list=ls())
 library(R.matlab)
@@ -19,9 +19,9 @@ library(hdm)
 
 source("Feng-2026_Illustration_funs.R")
 
-# Empirical diagnostics: run from Application/; original main outputs are skipped with
-# FENG_CHECKS_ONLY=1 Rscript --vanilla Feng-2026_Illustration.R
-# Set FENG_RUN_CHECKS=0 to reproduce only the original paper analysis.
+# Run from the Application/ directory. The default run writes all reported empirical outputs.
+# FENG_CHECKS_ONLY=1 skips the original main-output blocks and runs the diagnostic blocks.
+# FENG_RUN_CHECKS=0 skips diagnostics and the outputs generated from them.
 check.only <- identical(Sys.getenv("FENG_CHECKS_ONLY"), "1")
 run.checks <- check.only || !identical(Sys.getenv("FENG_RUN_CHECKS"), "0")
 dir.create("output", showWarnings=FALSE)
@@ -29,17 +29,16 @@ dir.create("output", showWarnings=FALSE)
 # Load data
 data <- readMat("data.mat")
 ret <- data$Re
-connect <- data$num[,3] #1: Shared Board 2: NY Connection 3: Geithner Schedule 4: Geithner Schedule 2007 
+connect <- data$num[,3] # Geithner schedule connections
 d <- 1*(connect>0)
 date1 <- data$GeiNomDat
 x <- t(ret[(date1-281):(date1-32),])   # n=583 by p=250, pre-treatment history
 y.t0 <- ret[date1-1,]                  # CAR0
 y.t1 <- y.t0+ret[date1,]               # CAR[0,1]
 p <- dim(x)[2]
-ctrlvar <- data$num[,8:10]             # 3 control vars
+ctrlvar <- data$num[,8:10]             # log assets, return on equity, and leverage
 
-# Estimation
-# define pars
+# Analysis parameters
 nlam   <- 4             # maximum number of local factors to be extracted
 y.full <- y.t1
 d.full <- d
@@ -48,15 +47,15 @@ n      <- length(d.full)
 range  <- 1:n
 subset <- (d.full==0)
 pr     <- mean(d.full)
-# A data-driven benchmark choice
+# Cross-validated benchmark choice of K
 if (check.only) {
-  K0 <- 99L # Established benchmark for diagnostics-only runs.
+  K0 <- 99L # Benchmark selected by the full analysis
 } else {
 Klist  <- 80:200
 Kcrit  <- knn.cv(nfolds=n, y=y.full, x=x.full[,p,drop=F], k=Klist, type="R")$crit
 K0     <- Klist[which.min(Kcrit)]
 }
-# several choices of K based on K0
+# Additional values of K reported in the ATT table
 Kseq   <- ceiling(K0 * c(.5, 1, 2))
 
 ##########################################################
@@ -65,13 +64,11 @@ Kseq   <- ceiling(K0 * c(.5, 1, 2))
 # Step 1: latent variables extraction
 # Step 1.1: illustrate KNN matching
 
-# Additional diagnostics: all-center matching, treatment cells, and blocked splits.
+# Matching diagnostics
 if (run.checks) {
   checks <- check_setup(data, x.full, y.full, d.full, ctrlvar, K0)
   check_matching(checks)
 }
-# End matching diagnostics.
-
 if (!check.only) {
 kmat      <- knn.index(A=x.full[,1:(p/2)], K=K0)
 distmat   <- dist.knn(A=x.full[,1:(p/2)])
@@ -83,29 +80,29 @@ dist.norm <- sapply(1:n, function(i) max(distmat[pos[,i],i])/sd(distmat[-i,i])) 
 treated   <- summary(dist.norm[d.full==1]); ctrl <- summary(dist.norm[d.full==0])
 sum.table <- round(rbind(treated, ctrl), 3)
 
-# Generate Table 1
+# Supplement table: K-NN Matching: Maximum Distance of Matched Pairs
 colheads <- c("Min.", "1st Qu.", "Median", "Mean", "3rd Qu.", "Max.")
 rowname  <- c("Treated", "Control")
-latex(sum.table, file=paste("output/MainPaper_Table_SumKNN", ".txt", sep = ""), 
+latex(sum.table, file=paste("output/SA_Table_Application_SumKNN", ".txt", sep = ""),
       append=FALSE, table.env=FALSE, center="none", title="",
       n.cgroup=NULL, cgroup=NULL, colheads=colheads,
       n.rgroup=NULL, rgroup=NULL, rowname=rowname
       )
 
-# label outliers
+# Controls used in the matching-discrepancy sensitivity calculation
 outlier <- which(dist.norm>=quantile(dist.norm[d.full==0], .9))
 }
 
 
 # Step 1.2: illustrate local PCA
 
-# Additional diagnostics: full local spectra, dimensions, and rotation-invariant spaces.
+# Local-factor diagnostics
 if (run.checks) check_factors(checks)
-# End local-factor diagnostics.
-
 if (!check.only) {
 index <- kmat[,illustration.unit]   # length n
 PC    <- lpca(A=x.full[,-(1:(p/2))], index=index, nlam=5, n=n, K=K0)
+
+# Main paper Figure 2(a): Singular values for one neighborhood
 ggplot()+geom_line(data=data.frame(x=1:5, y=PC$sv), aes(x=x,y=y))+
          xlab("Component Number")+ylab("Singular value")+
          theme_bw() + theme(panel.grid.minor = element_blank())
@@ -116,13 +113,11 @@ ggsave("output/scree.pdf", width = 5, height = 3)
 ##################################################
 # Step 2: local least squares
 
-# Additional diagnostics: held-out prediction, overlap, and balance.
+# Prediction, overlap, and balance diagnostics
 if (run.checks) {
   check_heldout(checks)
   check_nuisance(checks)
 }
-# End prediction, overlap, and balance diagnostics.
-
 if (!check.only) {
 
 # fitted sequence from day -30 to 1
@@ -145,7 +140,7 @@ w_att.me <- ifelse(d.full == 1, 1, result$ps/(1-result$ps))
 ps.z     <- glm.fit(x=cbind(1, ctrlvar), y=d.full, family=binomial())$fitted.values
 w_att.z  <- ifelse(d.full == 1, 1, ps.z/(1-ps.z))
 
-# Balance table
+# Main paper Figure 3(b): Balance in pre-treatment returns
 x.pre    <- t(ret[(date1-31):(date1-27),])
 dat <- data.frame(x1=x.pre[,1], x2=x.pre[,2], x3=x.pre[,3], x4=x.pre[,4], x5=x.pre[,5])
 
@@ -165,7 +160,7 @@ baplot + scale_shape_discrete(name = "Weighting scheme", labels = c("Unadjusted"
 ggsave(paste("output/love_plot", ".pdf", sep=""), width = 5, height = 4, dpi = 300)
 
 
-########## plot fitted values for y
+# Main paper Figure 3(a): Conditional mean of the untreated outcome
 plot <- ggplot()
 for (j in 1:N1) {
   plot.fit <- data.frame(y=mat.fit[-(1:10),j], t=-20:1, name="Fit") 
@@ -193,15 +188,14 @@ ggsave("output/fit.pdf", width = 5, height = 4)
 ################################################
 # Step 3: calculate ATT
 
-# Additional diagnostics: pre-treatment placebos and ATT sensitivities.
+# Pre-treatment placebo and ATT sensitivity diagnostics
 # Poor-match trimming preserves treated firms; the score trim changes the treated target.
 if (run.checks) {
   check_placebos(checks)
   check_sensitivity(checks)
+  # Write Figure 2(b) and the supplementary diagnostic tables and figures.
   check_finish(checks)
 }
-# End placebo and sensitivity diagnostics.
-
 if (!check.only) {
 
 # full sample
@@ -227,7 +221,6 @@ for  (j in 1:3) {
               (1-d.full)*(y.full-result$yfit)*result$ps/(1-result$ps))/pr)
    se     <- sqrt(mean(varphi^2))/sqrt(n)
    reg.table[2*j,2] <- paste("(", round(se, 3),  ")", sep="")
-   #reg.table[2*j,2] <- paste("[", -round(se*1.96,3), ", ", round(se*1.96,3), "]", sep="")
 }
 reg.table[c(2,4,6),1] <- ""
 
@@ -256,7 +249,6 @@ for  (j in 1:3) {
               (1-d.sub)*(y.sub-result$yfit)*result$ps/(1-result$ps))/pr)
    se     <- sqrt(mean(varphi^2))/sqrt(n)
    reg.table[2*j,3] <- paste("(", round(se, 3),  ")", sep="")
-   #reg.table[2*j,3] <- paste("[", -round(se*1.96,3), ", ", round(se*1.96,3), "]", sep="")
 }
 lasso.fit <- rlassoATET(x=x.sub, d=d.sub, y=y.sub, bootstrap = "none", model = FALSE)
 reg.table[7,3] <- format(round(lasso.fit$te, 3), nsmall=3)
@@ -285,7 +277,6 @@ for  (j in 1:3) {
               (1-d.sub)*(y.sub-result$yfit)*result$ps/(1-result$ps))/pr)
    se     <- sqrt(mean(varphi^2))/sqrt(n)
    reg.table[2*j,4] <- paste("(", round(se, 3),  ")", sep="")
-   #reg.table[2*j,4] <- paste("[", -round(se*1.96,3), ", ", round(se*1.96,3), "]", sep="")
 }
 lasso.fit <- rlassoATET(x=x.sub, d=d.sub, y=y.sub, bootstrap = "none", model = FALSE)
 reg.table[7,4] <- format(round(lasso.fit$te, 3), nsmall=3)
@@ -324,7 +315,6 @@ for  (j in 1:3) {
               (1-d.full)*(y.full-result$yfit)*result$ps/(1-result$ps))/pr)
    se     <- sqrt(mean(varphi^2))/sqrt(n)
    reg.table.ctr[2*j,2] <- paste("(", round(se, 3),  ")", sep="")
-   #reg.table.ctr[2*j,2] <- paste("[", -round(se*1.96,3), ", ", round(se*1.96,3), "]", sep="")
 }
 
 lasso.fit <- rlassoATET(x=cbind(x.full, ctrlvar), d=d.full, y=y.full, bootstrap = "none", model = FALSE)
@@ -354,7 +344,6 @@ for  (j in 1:3) {
               (1-d.sub)*(y.sub-result$yfit)*result$ps/(1-result$ps))/pr)
    se     <- sqrt(mean(varphi^2))/sqrt(n)
    reg.table.ctr[2*j,3] <- paste("(", round(se, 3),  ")", sep="")
-   #reg.table.ctr[2*j,3] <- paste("[", -round(se*1.96,3), ", ", round(se*1.96,3), "]", sep="")
 }
 
 lasso.fit <- rlassoATET(x=cbind(x.sub, ctrl.sub), d=d.sub, y=y.sub, bootstrap = "none", model = FALSE)
@@ -384,16 +373,15 @@ for  (j in 1:3) {
               (1-d.sub)*(y.sub-result$yfit)*result$ps/(1-result$ps))/pr)
    se     <- sqrt(mean(varphi^2))/sqrt(n)
    reg.table.ctr[2*j,4] <- paste("(", round(se, 3),  ")", sep="")
-   #reg.table.ctr[2*j,4] <- paste("[", -round(se*1.96,3), ", ", round(se*1.96,3), "]", sep="")
 }
 lasso.fit <- rlassoATET(x=cbind(x.sub, ctrl.sub), d=d.sub, y=y.sub, bootstrap = "none", model = FALSE)
 reg.table.ctr[7,4] <- format(round(lasso.fit$te, 3), nsmall=3)
 reg.table.ctr[8,4] <- paste("(", round(lasso.fit$se, 3),  ")", sep="")
 
 
-#######################################
-# generate Table 2 in the main paper ##
-#######################################
+#############################################################################
+# Main paper Table 1: Average Treatment Effect of Connections on the Treated #
+#############################################################################
 output <- cbind(reg.table[1:8,2], 
                 reg.table[1:8,4],
                 reg.table.ctr[,2], 
@@ -413,7 +401,7 @@ latex(output, file=paste("output/MainPaper_Table_ATT", ".txt", sep = ""),
       )
 
 ############################################################
-# Uniform Inference
+# Main paper Figure 4: Estimated CDFs of Potential Outcomes for the Treated
 # Test stochastic dominance F(1|1) over F(0|1)
 n <- length(y.full); subset <- (d.full==0); pr <- mean(d.full); 
 range <- 1:n
@@ -458,7 +446,7 @@ for (j in 1:L) {
    score[j,]    <- score.11[j,] - score.01[j,]
 }
 
-## Test SD: Simulate the process
+# Simulate the stochastic-dominance process
 set.seed(12345)
 sim <- 500; supre <- matrix(NA, sim, 1)
 for (l in 1:sim) {
@@ -469,7 +457,7 @@ for (l in 1:sim) {
 cval <- quantile(supre, .95)
 stat <- sqrt(n)*max(F.11-F.01)
 
-# confidence band
+# Simultaneous confidence bands
 sim <- 500; supre.11 <- supre.01 <- matrix(NA, sim, 1)
 
 t1.11 <- min(which(F.11>=.1)); t9.11 <- max(which(F.11<=.9))
@@ -501,14 +489,14 @@ plot.dist <- data.frame(x=eval, F11=F.11, F01=F.01,
                         F01.lb=F01.lb, F01.ub=F01.ub)
 plot.dist <- plot.dist[order(plot.dist$x),]
 plot <- ggplot(data=plot.dist)
-plot <- plot + geom_line(aes(x=x, y=F11, colour="y1", linetype="y1")) +
+plot <- plot + geom_ribbon(aes(x=x, ymin=F11.lb, ymax=F11.ub), fill="grey85", alpha=.6) +
+               geom_ribbon(aes(x=x, ymin=F01.lb, ymax=F01.ub), fill="grey55", alpha=.6) +
+               geom_line(aes(x=x, y=F11, colour="y1", linetype="y1")) +
                geom_line(aes(x=x, y=F01, colour="y0", linetype="y0")) +
-               geom_ribbon(aes(x=x, ymin=F11.lb, ymax=F11.ub), fill="grey70", alpha=.2) +
-               geom_ribbon(aes(x=x, ymin=F01.lb, ymax=F01.ub), fill="blue", alpha=.2) +
                scale_color_manual(name = 'CDF', 
                                   breaks = c("y0", "y1"),
                                   labels = c(expression(y[i](0)~"|"~t[i]==1), expression(y[i](1)~"|"~t[i]==1)),
-                                  values = c('y1' = 'black', 'y0' = 'blue')) +
+                                  values = c('y1' = 'black', 'y0' = 'black')) +
                scale_linetype_manual(name = 'CDF', 
                                      breaks = c("y0", "y1"),
                                      labels = c(expression(y[i](0)~"|"~t[i]==1), expression(y[i](1)~"|"~t[i]==1)),

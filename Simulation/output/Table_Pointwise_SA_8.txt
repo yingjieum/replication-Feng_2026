@@ -1,0 +1,37 @@
+\begin{tabular}{lccccccccc}
+\hline\hline
+\multicolumn{1}{l}{\bfseries }&\multicolumn{5}{c}{\bfseries Local PCA, $K=$}&\multicolumn{1}{c}{\bfseries }&\multicolumn{1}{c}{\bfseries DR}&\multicolumn{1}{c}{\bfseries }&\multicolumn{1}{c}{\bfseries DR-DL}\tabularnewline
+\cline{2-6} \cline{8-8} \cline{10-10}
+\multicolumn{1}{l}{}&\multicolumn{1}{c}{$K_1$}&\multicolumn{1}{c}{$K_2$}&\multicolumn{1}{c}{$K_3$}&\multicolumn{1}{c}{$K_4$}&\multicolumn{1}{c}{$\widehat{K}_{\mathtt{CV}}$}&\multicolumn{1}{c}{}&\multicolumn{1}{c}{}&\multicolumn{1}{c}{}&\multicolumn{1}{c}{}\tabularnewline
+\hline
+{\bfseries Model 1}&&&&&&&&&\tabularnewline
+~~RMSE&$0.117$&$0.117$&$0.120$&$0.124$&$0.118$&&$0.191$&&$0.201$\tabularnewline
+~~CR&$0.911$&$0.915$&$0.908$&$0.895$&$0.911$&&$0.684$&&$0.803$\tabularnewline
+~~AL&$0.400$&$0.397$&$0.398$&$0.400$&$0.398$&&$0.417$&&$0.519$\tabularnewline
+\hline
+{\bfseries Model 2}&&&&&&&&&\tabularnewline
+~~RMSE&$0.100$&$0.098$&$0.098$&$0.099$&$0.100$&&$0.159$&&$0.140$\tabularnewline
+~~CR&$0.941$&$0.942$&$0.946$&$0.947$&$0.940$&&$0.806$&&$0.925$\tabularnewline
+~~AL&$0.376$&$0.373$&$0.373$&$0.375$&$0.374$&&$0.405$&&$0.471$\tabularnewline
+\hline
+{\bfseries Model 3}&&&&&&&&&\tabularnewline
+~~RMSE&$0.102$&$0.101$&$0.101$&$0.104$&$0.101$&&$0.185$&&$0.196$\tabularnewline
+~~CR&$0.937$&$0.937$&$0.937$&$0.938$&$0.941$&&$0.710$&&$0.816$\tabularnewline
+~~AL&$0.377$&$0.377$&$0.379$&$0.382$&$0.378$&&$0.418$&&$0.515$\tabularnewline
+\hline
+{\bfseries Model 4}&&&&&&&&&\tabularnewline
+~~RMSE&$0.133$&$0.119$&$0.117$&$0.120$&$0.124$&&$0.440$&&$0.222$\tabularnewline
+~~CR&$0.934$&$0.947$&$0.961$&$0.969$&$0.945$&&$0.826$&&$0.936$\tabularnewline
+~~AL&$0.483$&$0.468$&$0.487$&$0.520$&$0.477$&&$1.186$&&$0.803$\tabularnewline
+\hline
+{\bfseries Model 5}&&&&&&&&&\tabularnewline
+~~RMSE&$0.218$&$0.232$&$0.252$&$0.274$&$0.241$&&$0.513$&&$0.344$\tabularnewline
+~~CR&$0.890$&$0.873$&$0.844$&$0.815$&$0.854$&&$0.774$&&$0.705$\tabularnewline
+~~AL&$0.697$&$0.701$&$0.719$&$0.744$&$0.708$&&$1.290$&&$0.769$\tabularnewline
+\hline
+{\bfseries Model 6}&&&&&&&&&\tabularnewline
+~~RMSE&$0.282$&$0.292$&$0.306$&$0.322$&$0.301$&&$0.512$&&$0.311$\tabularnewline
+~~CR&$0.871$&$0.864$&$0.861$&$0.858$&$0.865$&&$0.784$&&$0.825$\tabularnewline
+~~AL&$0.869$&$0.875$&$0.904$&$0.936$&$0.894$&&$1.311$&&$0.852$\tabularnewline
+\hline
+\end{tabular}

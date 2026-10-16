@@ -1,0 +1,27 @@
+\begin{tabular}{lccccccccc}
+\hline\hline
+\multicolumn{1}{l}{\bfseries }&\multicolumn{5}{c}{\bfseries Local PCA, $K=$}&\multicolumn{1}{c}{\bfseries }&\multicolumn{1}{c}{\bfseries DR}&\multicolumn{1}{c}{\bfseries }&\multicolumn{1}{c}{\bfseries DR-DL}\tabularnewline
+\cline{2-6} \cline{8-8} \cline{10-10}
+\multicolumn{1}{l}{}&\multicolumn{1}{c}{32}&\multicolumn{1}{c}{63}&\multicolumn{1}{c}{95}&\multicolumn{1}{c}{126}&\multicolumn{1}{c}{$\widehat{K}_{\mathtt{CV}}$}&\multicolumn{1}{c}{}&\multicolumn{1}{c}{}&\multicolumn{1}{c}{}&\multicolumn{1}{c}{}\tabularnewline
+\hline
+{\bfseries $(n,p)=(500, 125)$}&&&&&&&&&\tabularnewline
+~~RMSE&$0.344$&$0.347$&$0.358$&$0.370$&$0.354$&&$0.521$&&$0.351$\tabularnewline
+~~CR&$0.840$&$0.837$&$0.832$&$0.827$&$0.833$&&$0.787$&&$0.818$\tabularnewline
+~~AL&$0.971$&$0.969$&$0.989$&$1.014$&$0.985$&&$1.320$&&$0.944$\tabularnewline
+\hline
+{\bfseries $(n,p)=(500, 250)$}&&&&&&&&&\tabularnewline
+~~RMSE&$0.275$&$0.282$&$0.295$&$0.310$&$0.294$&&$0.514$&&$0.323$\tabularnewline
+~~CR&$0.859$&$0.859$&$0.858$&$0.855$&$0.858$&&$0.785$&&$0.809$\tabularnewline
+~~AL&$0.828$&$0.830$&$0.857$&$0.888$&$0.851$&&$1.320$&&$0.861$\tabularnewline
+\hline
+{\bfseries $(n,p)=(500, 500)$}&&&&&&&&&\tabularnewline
+~~RMSE&$0.227$&$0.234$&$0.247$&$0.259$&$0.244$&&$0.513$&&$0.312$\tabularnewline
+~~CR&$0.886$&$0.878$&$0.873$&$0.874$&$0.878$&&$0.793$&&$0.793$\tabularnewline
+~~AL&$0.725$&$0.730$&$0.756$&$0.788$&$0.751$&&$1.320$&&$0.799$\tabularnewline
+\hline
+{\bfseries $(n,p)=(500, 750)$}&&&&&&&&&\tabularnewline
+~~RMSE&$0.205$&$0.214$&$0.227$&$0.235$&$0.224$&&$0.523$&&$0.307$\tabularnewline
+~~CR&$0.905$&$0.889$&$0.879$&$0.883$&$0.888$&&$0.776$&&$0.784$\tabularnewline
+~~AL&$0.679$&$0.688$&$0.713$&$0.745$&$0.709$&&$1.319$&&$0.770$\tabularnewline
+\hline
+\end{tabular}

@@ -2,8 +2,6 @@
 ## Causal inference in nonlinear factor models#
 ######## Supporting functions #################
 ##### for empirical illustration ##############
-# Note: some functions are slightly different #
-#     from those for simulation             ###
 ###############################################
 # Searching KNN
 dist.inf <-  function(v, A2) {
@@ -38,17 +36,6 @@ knn.index <- function(A, K=NULL) {    # A: n by p; # K: tuning param.
 }
 
 
-# sel.r <- function(sval, n) {
-#   d <- length(sval)
-#   ratio <- (sval[-d] / sval[-1]) < log(log(n))
-#   if (any(ratio)) {
-#     r <- max(which.max(ratio)-1, 1)
-#   } else {
-#     r <- d - 1
-#   }
-#   return(r)
-# }
-
 sel.r <- function(sval, n, p, sd) {
   check <- (sval > log(log(n)) * (sqrt(n)+sqrt(p)) * sd)   # make it proportional to sd of data
   d <- length(sval)
@@ -66,7 +53,6 @@ lpca <- function(A, index, nlam, n, K) {
   A <- cbind(1:n, A)   # add a row number
   A <- A[index,]
   svd <- irlba(A[,-1], nu=nlam, nv=nlam)
-  # pos <- which(A[,1]==i)
   r <- sel.r(svd$d, K, ncol(A)-1, sd(A[,-1]))
   return(list(Lam=svd$u[,1:r,drop=F], no.neigh=A[,1], sv=svd$d, d.i=r))    # Lam: K by r matrix
 }
@@ -96,7 +82,6 @@ pred <- function(i, y, d, x, subset=NULL, kmat, nlam, n, p, ctrlvar=NULL, shutdo
     sub    <- index & subset   # of length n
     y.sub  <- y[sub]
     design <- cbind(1, PC$Lam[sub[index],,drop=F])
-    #design <- PC$Lam[sub[index],,drop=F]
     if (!is.null(ctrlvar)) {
       design <- cbind(design, ctrlvar[sub,])
     }
@@ -104,7 +89,6 @@ pred <- function(i, y, d, x, subset=NULL, kmat, nlam, n, p, ctrlvar=NULL, shutdo
     # eval
     design.d <- cbind(1, PC$Lam)
     eval     <- design.d[which(PC$no.neigh==i),]
-    #eval <- PC$Lam[which(PC$no.neigh==i),]
     if (!is.null(ctrlvar)) {
       eval <- c(eval, ctrlvar[i,])
     }
@@ -120,18 +104,6 @@ pred <- function(i, y, d, x, subset=NULL, kmat, nlam, n, p, ctrlvar=NULL, shutdo
         model    <- glm.fit(x=design.d, y=d[index], family=binomial())
         d.fitval <- model$family$linkinv(sum(model$coeff * eval))      
         
-        # run a local regression of d at ith obs.
-        # if (is.null(ctrlvar)) {
-        #   d.fitval <- mean(d[index])
-        # } else {
-        #   design.d <- cbind(PC$Lam, ctrlvar[index,])
-        #   model    <- glm.fit(x=design.d, y=d[index], family=binomial())
-        #   d.fitval <- model$family$linkinv(sum(model$coeff * eval))
-        # }
-       
-        # trimming
-        #if (d.fitval<0) d.fitval <- 0
-        #if (d.fitval>1) d.fitval <- 1
     }
     
     return(c(y.fitval, d.fitval))   # two scalars
@@ -152,9 +124,9 @@ compute <- function(range, y, d, x, subset=NULL, K, nlam, n, p, const=F, ctrlvar
 }
 
 ############################################################
-# Additional empirical diagnostics, separate from the benchmark helpers.
+# Empirical diagnostic functions
 
-# Run a stochastic check without changing the main analysis's RNG state.
+# Preserve the main analysis RNG state.
 check_seed <- function(seed, expr) {
   had.seed <- exists(".Random.seed", envir=.GlobalEnv, inherits=FALSE)
   if (had.seed) old.seed <- get(".Random.seed", envir=.GlobalEnv)
@@ -165,7 +137,7 @@ check_seed <- function(seed, expr) {
   force(expr)
 }
 
-# Record numerical warnings locally rather than suppressing their evidence.
+# Capture numerical warnings.
 check_capture <- function(expr) {
   warnings <- character()
   value <- withCallingHandlers(tryCatch(expr, error=function(e) e),
@@ -176,7 +148,7 @@ check_capture <- function(expr) {
   list(value=value, warnings=unique(warnings))
 }
 
-# Save an auditable table using the check- prefix.
+# Write a diagnostic table.
 check_write <- function(state, name, tab) {
   state$tables[[name]] <- tab
   write.csv(tab, file.path(state$output, paste0("check-", name, ".csv")),
@@ -184,7 +156,7 @@ check_write <- function(state, name, tab) {
   invisible(tab)
 }
 
-# Define the exact paper samples, unused outcomes, and blocked proxy splits.
+# Define samples, unused outcomes, and proxy splits.
 check_setup <- function(data, x, y, d, z, K,
                         output=Sys.getenv("FENG_CHECK_OUTPUT", "output/intermediate/application-diagnostics")) {
   state <- new.env(parent=emptyenv())
@@ -230,7 +202,7 @@ check_setup <- function(data, x, y, d, z, K,
   state
 }
 
-# Compute center-inclusive neighborhoods under the three implemented distances.
+# Compute center-inclusive neighborhoods.
 check_neighbors <- function(state, s, tag, split="benchmark", K=state$K,
                             distance="pseudo-max") {
   key <- paste("neighbors", tag, split, K, distance, sep="|")
@@ -260,7 +232,7 @@ check_neighbors <- function(state, s, tag, split="benchmark", K=state$K,
   out
 }
 
-# Step 1.1: describe matches and split stability for every center in both samples.
+# Matching and split-stability diagnostics
 check_matching <- function(state) {
   tabs <- stability <- list()
   for (nm in names(state$samples)) {
@@ -285,7 +257,7 @@ check_matching <- function(state) {
   invisible(state)
 }
 
-# Cache exact local SVDs, including the full spectrum to diagnose the four-PC cap.
+# Compute local singular-value decompositions.
 check_basis <- function(state, s, tag, split="benchmark", K=state$K,
                         distance="pseudo-max") {
   key <- paste("basis", tag, split, K, distance, sep="|")
@@ -302,12 +274,12 @@ check_basis <- function(state, s, tag, split="benchmark", K=state$K,
   out
 }
 
-# Apply the existing forced-at-least-one rule or an explicitly named sensitivity.
+# Select the local dimension.
 check_dimension <- function(pc, multiplier=1, cap=4) {
   min(max(sum(pc$sv > multiplier*pc$threshold),1),cap,ncol(pc$u))
 }
 
-# Step 1.2: report all spectra, fixed-neighborhood subspace stability, and serial dependence.
+# Local-factor and loading-space diagnostics
 check_factors <- function(state) {
   signals <- dimensions <- spaces <- serial <- list()
   for (nm in names(state$samples)) {
@@ -327,7 +299,7 @@ check_factors <- function(state) {
         leading_ratio=pc$sv[1]/pc$threshold)
     }))
     for (split in setdiff(names(state$splits),"benchmark")) {
-      # Keep benchmark neighborhoods fixed; only the PCA columns change.
+      # Hold benchmark neighborhoods fixed when changing PCA columns.
       spaces[[paste(nm,split)]] <- do.call(rbind,lapply(seq_along(pcs),function(i) {
         a <- pcs[[i]]; A <- s$x[a$ids,state$splits[[split]]$pca,drop=FALSE]
         fit <- svd(A,nu=4,nv=0)
@@ -355,7 +327,7 @@ check_factors <- function(state) {
   invisible(state)
 }
 
-# Fit local outcomes and logits once per center; retain original untrimmed predictions.
+# Fit local outcome and treatment models.
 check_fit <- function(state,s,tag,split="benchmark",K=state$K,distance="pseudo-max",
                       multiplier=1,cap=4,covariates=FALSE,leave_center_out=FALSE) {
   pcs <- check_basis(state,s,tag,split,K,distance)
@@ -392,7 +364,7 @@ check_fit <- function(state,s,tag,split="benchmark",K=state$K,distance="pseudo-m
   list(yfit=predictions,ps=ps,records=do.call(rbind,records))
 }
 
-# Compute the paper's ATT and influence-function SE without clipping or deleting failures.
+# Compute the ATT and its influence-function standard error.
 check_att <- function(y,d,fit,ps) {
   if (is.null(dim(y))) y <- matrix(y,ncol=1)
   if (is.null(dim(fit))) fit <- matrix(fit,ncol=1)
@@ -404,8 +376,8 @@ check_att <- function(y,d,fit,ps) {
   list(att=tau,se=se,influence=influence)
 }
 
-# Step 2: validate prediction on unseen units AND unseen proxy dates.
-# Predictions use held-out unit folds; covariate-only comparators never use proxies.
+# Held-out prediction across units and proxy dates
+# Covariate-only comparisons do not use proxies.
 check_prediction_design <- function(state,s,nm,design,matching,pca,target,controls_only=FALSE) {
   fold <- state$folds[[nm]]
   kmat <- knn.index(s$x[,matching,drop=FALSE],K=state$K)
@@ -455,7 +427,7 @@ check_prediction_design <- function(state,s,nm,design,matching,pca,target,contro
 }
 
 check_heldout <- function(state) {
-  # All proxy dates enter three disjoint, contiguous groups; the ATT estimator is unchanged.
+  # Use three disjoint, contiguous groups of proxy dates.
   designs <- list(chronological_gapless=list(match=1:100,pca=101:200,hold=201:250),
     reversed_gapless=list(match=151:250,pca=51:150,hold=1:50))
   tabs <- definitions <- outcome <- list()
@@ -485,7 +457,7 @@ check_heldout <- function(state) {
   invisible(state)
 }
 
-# ATT balance uses the treated sample SD as a fixed denominator for every scheme.
+# Use the treated-sample standard deviation for every balance calculation.
 check_balance <- function(s,weights,scheme,sample) {
   treated <- s$d==1; control <- !treated
   reference <- apply(s$balance[treated,,drop=FALSE],2,sd)
@@ -495,7 +467,7 @@ check_balance <- function(s,weights,scheme,sample) {
     treated_mean=mt,control_mean=mc,treated_sd=reference,smd=(mt-mc)/reference)
 }
 
-# Step 2: nuisance-fit warnings, overlap, ATT weights, and balance in unused returns/controls.
+# Nuisance-fit, overlap, weight, and balance diagnostics
 check_nuisance <- function(state) {
   records <- balance <- overlap <- list()
   state$baseline <- list()
@@ -536,7 +508,7 @@ check_nuisance <- function(state) {
   invisible(state)
 }
 
-# Step 3: pre-treatment ATT placebos with simultaneous multiplier bands over all 34 outcomes.
+# Pre-treatment placebo estimates with simultaneous multiplier bands
 check_placebos <- function(state) {
   tabs <- list()
   for (nm in names(state$samples)) for (cov in c(FALSE,TRUE)) {
@@ -559,9 +531,9 @@ check_placebos <- function(state) {
   invisible(state)
 }
 
-# Step 3: broaden sensitivities, distinguishing control and treated-score trimming.
+# ATT sensitivity calculations
 check_sensitivity <- function(state) {
-  # Sensitivity choices at fixed K: dimension rules, distances, ordered splits, and trimming.
+  # Dimension, distance, proxy-split, and trimming specifications at fixed K.
   specs <- list(benchmark=list(),threshold075=list(multiplier=.75),threshold125=list(multiplier=1.25),
     squaredEuclidean=list(distance="squared-Euclidean"),averages=list(distance="averages"),
     reversed=list(split="reversed"),boundary100=list(split="boundary100"),boundary150=list(split="boundary150"),
@@ -613,8 +585,7 @@ check_sensitivity <- function(state) {
           dropped_controls=dropped)
       }
     }
-    # Treated-score sensitivity: remove benchmark-treated firms with a
-    # covariate-adjusted propensity above 0.9, then refit everything.
+    # Remove treated firms with a covariate-adjusted propensity above 0.9 and refit.
     baseline <- state$baseline[[paste(nm,TRUE,sep="|")]]
     drop <- original$d==1 & baseline$ps>.9
     stopifnot(sum(drop)==1L)
@@ -629,7 +600,7 @@ check_sensitivity <- function(state) {
   invisible(state)
 }
 
-# Diagnostic figures show every active specification with explicit failure labels.
+# Diagnostic figures
 check_figures <- function(state,only=NULL) {
   draw <- function(name,expr,layout=c(2,2)) {
     if(!is.null(only) && !name %in% only) return(invisible(NULL))
@@ -733,11 +704,11 @@ check_prediction_summary <- function(tab,outcome=FALSE) {
   do.call(rbind,groups)
 }
 
-# Concise result report; all active results remain in the accompanying CSVs.
+# Diagnostic report
 check_report <- function(state) {
   check_write(state,"prediction-gains",check_prediction_summary(state$tables[["heldout-prediction"]]))
   check_write(state,"outcome-gains",check_prediction_summary(state$tables[["outcome-prediction"]],TRUE))
-  # Primary reporting focus: treated firms in the later block of the gapless design.
+  # Treated firms in the later block of the gapless design.
   focus <- subset(state$tables[["prediction-gains"]],design=="chronological_gapless" & group=="treated")
   focus$prediction_first_day <- -80L
   focus$prediction_last_day <- -31L
@@ -837,7 +808,7 @@ check_report <- function(state) {
   invisible(summary)
 }
 
-# Preserve audit inputs, seeds, and predictions alongside the reports.
+# Save diagnostics and session information.
 check_finish <- function(state) {
   check_report(state)
   check_figures(state)
@@ -850,14 +821,14 @@ check_finish <- function(state) {
   invisible(state)
 }
 
-# Write a LaTeX tabular fragment that can be copied directly into the paper input folder.
+# Write a LaTeX table fragment.
 application_write_table <- function(output, name, lines) {
   path <- file.path(output,name)
   writeLines(lines,path)
   path
 }
 
-# Recreate the main-paper distribution of the second local singular-value ratio.
+# Main paper Figure 2(b): Second singular-value ratios
 application_figure_singular_ratio <- function(signals, output) {
   values <- subset(signals,sample=="full" & component==2L)
   stopifnot(nrow(values)==583L,!anyDuplicated(values$unit),
@@ -874,7 +845,7 @@ application_figure_singular_ratio <- function(signals, output) {
   path
 }
 
-# Recreate the supplemental matching-discrepancy distributions for both samples.
+# Supplement figure: Distributions of Normalized Maximum Matching Discrepancy
 application_figure_matching <- function(neighborhoods, output) {
   neighborhoods <- subset(neighborhoods,sample %in% c("full","base") &
     split=="benchmark" & distance=="pseudo-max" & K==99)
@@ -915,7 +886,7 @@ application_figure_matching <- function(neighborhoods, output) {
   path
 }
 
-# Recreate the supplemental distributions of the first two local eigenvalue ratios.
+# Supplement figure: Distributions of the First Two Local Eigenvalue Ratios
 application_figure_eigen_ratios <- function(signals, output) {
   path <- file.path(output,"eigen_ratio_dist.pdf")
   pdf(path,width=6.6,height=2.7,useDingbats=FALSE)
@@ -946,7 +917,7 @@ application_figure_eigen_ratios <- function(signals, output) {
   path
 }
 
-# Write the paper-ready ATT sensitivity table from freshly computed checks.
+# Supplement table: Sensitivity to Dimension Selection, Proxy Splitting, and Trimming
 application_write_sensitivity <- function(sensitivity, output="output") {
   pick_sensitivity <- function(sample_name,spec,with_covariates)
     sensitivity[sensitivity$sample==sample_name & sensitivity$specification==spec &
@@ -979,18 +950,23 @@ application_write_sensitivity <- function(sensitivity, output="output") {
     "\\hline",rows,"\\hline","\\end{tabular}"))
 }
 
-# Export every empirical table and figure currently reported in the paper or supplement.
+# Write Figure 2(b) and the reported supplementary tables and figures.
 write_application_outputs <- function(state, output="output") {
   dir.create(output,showWarnings=FALSE,recursive=TRUE)
   tabs <- state$tables
   required <- c("sensitivity","split-stability","factor-space","prediction-gains",
     "outcome-gains","placebos","dimensions","signals","balance","neighborhoods")
   stopifnot(all(required %in% names(tabs)))
-  files <- c(
-    application_figure_singular_ratio(tabs$signals,output),
-    application_figure_matching(tabs$neighborhoods,output),
-    application_figure_eigen_ratios(tabs$signals,output))
+  # Main paper Figure 2(b): Second singular-value ratios
+  files <- application_figure_singular_ratio(tabs$signals,output)
 
+  # Supplement figure: Distributions of Normalized Maximum Matching Discrepancy
+  files <- c(files,application_figure_matching(tabs$neighborhoods,output))
+
+  # Supplement figure: Distributions of the First Two Local Eigenvalue Ratios
+  files <- c(files,application_figure_eigen_ratios(tabs$signals,output))
+
+  # Supplement table: Sensitivity to Dimension Selection, Proxy Splitting, and Trimming
   files <- c(files,application_write_sensitivity(tabs$sensitivity,output))
 
   sensitivity <- tabs$sensitivity
@@ -998,7 +974,7 @@ write_application_outputs <- function(state, output="output") {
     sensitivity[sensitivity$sample==sample_name & sensitivity$specification==spec &
       sensitivity$covariates==with_covariates,]
 
-  # Neighbor and loading-space stability across ordered proxy splits.
+  # Supplement table: Stability of Neighbor Sets and Local Loading Spaces Across Proxy Splits
   overlap <- tabs[["split-stability"]]; spaces <- tabs[["factor-space"]]
   stability_value <- function(tab,sample,split,treated,value) {
     keep <- tab$sample==sample & tab$split==split
@@ -1022,7 +998,7 @@ write_application_outputs <- function(state, output="output") {
     "Sample & Split & Treated & All & Treated & All \\\\","\\hline",rows,
     "\\hline","\\end{tabular}")))
 
-  # Held-out proxy and untreated-event prediction gains.
+  # Supplement table: Held-Out Prediction Beyond Observed Covariates
   proxy <- subset(tabs[["prediction-gains"]],design=="chronological_gapless" & group=="treated")
   event <- tabs[["outcome-gains"]]
   stopifnot(nrow(proxy)==2L,nrow(event)==2L)
@@ -1042,7 +1018,7 @@ write_application_outputs <- function(state, output="output") {
     "Sample & Prediction target & Firms & Linear gain (\\%) & $K$-NN gain (\\%) \\\\",
     "\\hline",rows,"\\hline","\\end{tabular}")))
 
-  # Simultaneously adjusted pre-event outcome checks.
+  # Supplement table: Pre-Event Outcome Checks
   rows <- unlist(lapply(c("full","base"),function(sample)
     vapply(c(FALSE,TRUE),function(covariates) {
       x <- tabs$placebos[tabs$placebos$sample==sample &
@@ -1057,7 +1033,7 @@ write_application_outputs <- function(state, output="output") {
     "Sample & Covariates & Daily rejections (30) & Cumulative rejections (4) \\\\",
     "\\hline",rows,"\\hline","\\end{tabular}")))
 
-  # Selected dimensions and quartiles of the first two signal ratios.
+  # Supplement table: Selected Local Dimensions and Signals Across Neighborhoods
   rows <- vapply(c("full","base"),function(sample) {
     dims <- tabs$dimensions[tabs$dimensions$sample==sample,]
     ratios <- vapply(1:2,function(component) {
@@ -1073,7 +1049,7 @@ write_application_outputs <- function(state, output="output") {
     "Sample & $\\ttd_i=1$ & $\\ttd_i=2$ & First eigenvalue ratio & Second eigenvalue ratio \\\\",
     "\\hline",rows,"\\hline","\\end{tabular}")))
 
-  # Absolute standardized differences for the three observed covariates.
+  # Supplement table: Observed-Covariate Balance Before and After Reweighting
   variables <- c("Log assets","ROE","Leverage")
   rows <- unlist(lapply(c("full","base"),function(sample)
     vapply(c("Unadjusted","Local.PCA.with.controls"),function(scheme) {
@@ -1091,7 +1067,7 @@ write_application_outputs <- function(state, output="output") {
     "Sample & Control weights & Log assets & ROE & Leverage \\\\","\\hline",rows,
     "\\hline","\\end{tabular}")))
 
-  # ATT-relevant propensity summaries before and after 5-percent poor-match trimming.
+  # Supplement table: Propensity-Score Diagnostics for the ATT
   ps_range <- function(mean,min,max,control=FALSE) {
     lo <- if(control && min<.001) "$<0.001$" else sprintf("%.3f",min)
     hi <- if(max>.999) "$>0.999$" else sprintf("%.3f",max)
