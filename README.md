@@ -25,13 +25,13 @@ The application uses data from Daron Acemoglu, Simon Johnson, Amir Kermani, Jame
 
 `Application/data.mat` is the analysis-ready input. No preprocessing is needed before running the application script. The objects used by the code are:
 
-| Object | Description |
-| --- | --- |
-| `Re` | Daily firm returns. The columns are 583 firms; rows are trading dates. The code uses 250 pre-event returns as proxies and returns on event days 0 and 1 to form CAR[0,1]. |
-| `num` | Firm-level variables. Column 3 records Geithner schedule connections; columns 8–10 are log total assets, return on equity, and total debt divided by total capital in 2008. |
-| `GeiNomDat` | Row index for the November 21, 2008 announcement date. |
-| `CorrCiti` and `CorrCitiTr` | Firm-level correlation with Citigroup and the cutoff used to form the base sample. |
-| `Statadate` | Trading dates, stored as days since January 1, 1960; used in diagnostic records. |
+| Object                          | Description                                                                                                                                                                  |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Re`                          | Daily firm returns. The columns are 583 firms; rows are trading dates. The code uses 250 pre-event returns as proxies and returns on event days 0 and 1 to form CAR[0,1].    |
+| `num`                         | Firm-level variables. Column 3 records Geithner schedule connections; columns 8–10 are log total assets, return on equity, and total debt divided by total capital in 2008. |
+| `GeiNomDat`                   | Row index for the November 21, 2008 announcement date.                                                                                                                       |
+| `CorrCiti` and `CorrCitiTr` | Firm-level correlation with Citigroup and the cutoff used to form the base sample.                                                                                           |
+| `Statadate`                   | Trading dates, stored as days since January 1, 1960; used in diagnostic records.                                                                                             |
 
 A firm is treated when `num[,3] > 0`. The full sample has 583 firms, including 22 treated firms. The base sample excludes firms whose returns are highly correlated with Citigroup and has 526 firms, including 12 treated firms. The proxy window is event days -280 through -31. Event days -30 through -1 are excluded from the proxies and used for pre-event checks.
 
@@ -47,14 +47,14 @@ The script reads `data.mat`, sources `Feng-2026_Illustration_funs.R`, and writes
 
 The reported outputs are:
 
-| Output | Location in the paper or supplement |
-| --- | --- |
-| `MainPaper_Table_ATT.txt` | Main paper, Table 1 |
-| `scree.pdf`, `singular_ratio_full.pdf` | Main paper, Figure 2 |
-| `fit.pdf`, `love_plot.pdf` | Main paper, Figure 3 |
-| `SD.pdf` | Main paper, Figure 4 |
-| `SA_Table_Application_*.txt` | Supplement, Tables SA-1 through SA-8 |
-| `matching_discrepancy_dist.pdf`, `eigen_ratio_dist.pdf` | Supplementary application figures |
+| Output                                                      | Location in the paper or supplement  |
+| ----------------------------------------------------------- | ------------------------------------ |
+| `MainPaper_Table_ATT.txt`                                 | Main paper, Table 1                  |
+| `scree.pdf`, `singular_ratio_full.pdf`                  | Main paper, Figure 2                 |
+| `fit.pdf`, `love_plot.pdf`                              | Main paper, Figure 3                 |
+| `SD.pdf`                                                  | Main paper, Figure 4                 |
+| `SA_Table_Application_*.txt`                              | Supplement, Tables SA-1 through SA-8 |
+| `matching_discrepancy_dist.pdf`, `eigen_ratio_dist.pdf` | Supplementary application figures    |
 
 The default run also writes supporting diagnostic files under `Application/output/intermediate/application-diagnostics/`. These files record checks and are not manuscript inputs.
 
@@ -77,16 +77,16 @@ The script creates two output directories:
 
 The reported outputs are:
 
-| Output | Location in the paper or supplement |
-| --- | --- |
-| `hist_dr_la_lpca.pdf` | Main paper, Figure 1 |
-| `Table_Pointwise_MainPaper.txt` | Main paper, Table 2 |
+| Output                                                            | Location in the paper or supplement   |
+| ----------------------------------------------------------------- | ------------------------------------- |
+| `hist_dr_la_lpca.pdf`                                           | Main paper, Figure 1                  |
+| `Table_Pointwise_MainPaper.txt`                                 | Main paper, Table 2                   |
 | `Table_Pointwise_SA_1.txt` through `Table_Pointwise_SA_9.txt` | Supplement, Tables SA-9 through SA-17 |
 
 Existing files with the same names in either output directory are overwritten when the script is run.
 
-## Paper
+## References
 
-Yingjie Feng (2026). [Causal Inference in Possibly Nonlinear Factor Models](https://drive.google.com/file/d/1yu7CwLfofrHO64d2cwvwXknqS0xKmMT2/view?usp=sharing). Working Paper. [Supplement](https://drive.google.com/file/d/1riyeqX9Vnuj-2aq1bnSeQDvKrCf0zo8b/view?usp=sharing).
+Yingjie Feng (2026). [Causal Inference in Possibly Nonlinear Factor Models](https://drive.google.com/file/d/1yu7CwLfofrHO64d2cwvwXknqS0xKmMT2/view?usp=sharing). Accepted at *The Review of Economics and Statistics*. [Supplementary material](https://drive.google.com/file/d/1riyeqX9Vnuj-2aq1bnSeQDvKrCf0zo8b/view?usp=sharing).
 
-The local PCA procedure used in the paper builds on Yingjie Feng (2026), [Optimal Estimation of Large-Dimensional Nonlinear Factor Models](https://drive.google.com/file/d/1mHQNn-6LNh2tCuroZdFlP31Dt4H6C7O6/view?usp=drive_link). Working Paper.
+Yingjie Feng (2026), [Optimal Estimation of Large-Dimensional Nonlinear Factor Models](https://drive.google.com/file/d/1mHQNn-6LNh2tCuroZdFlP31Dt4H6C7O6/view?usp=drive_link). Working Paper.
