@@ -140,7 +140,7 @@ check_seed <- function(seed, expr) {
 # Capture numerical warnings.
 check_capture <- function(expr) {
   warnings <- character()
-  value <- withCallingHandlers(tryCatch(expr, error=function(e) e),
+  value <- withCallingHandlers(expr,
     warning=function(w) {
       warnings <<- c(warnings, conditionMessage(w))
       invokeRestart("muffleWarning")
