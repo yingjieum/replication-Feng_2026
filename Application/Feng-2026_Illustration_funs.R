@@ -839,7 +839,7 @@ application_figure_singular_ratio <- function(signals, output) {
       fill="grey80",color="grey35",linewidth=.3)+
     labs(x="Second singular value / selection threshold",
       y="Fraction of neighborhoods")+
-    theme_bw()+theme(panel.grid.minor=element_blank())
+    theme_bw(base_size=12)+theme(panel.grid.minor=element_blank())
   path <- file.path(output,"singular_ratio_full.pdf")
   ggsave(path,figure,width=5,height=3,device="pdf",useDingbats=FALSE)
   path

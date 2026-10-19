@@ -1,7 +1,7 @@
 #####################################################
 ##### Causal Inference in Nonlinear Factor Models ###
 ############ Empirical Application ##################
-########### Last updated: 10/15/2026 ################
+########### Last updated: 10/19/2026 ################
 #####################################################
 # This script reproduces the empirical results in Feng (2026).
 # Data source: Acemoglu et al. (Journal of Financial Economics, 2016).
@@ -105,7 +105,7 @@ PC    <- lpca(A=x.full[,-(1:(p/2))], index=index, nlam=5, n=n, K=K0)
 # Main paper Figure 2(a): Singular values for one neighborhood
 ggplot()+geom_line(data=data.frame(x=1:5, y=PC$sv), aes(x=x,y=y))+
          xlab("Component Number")+ylab("Singular value")+
-         theme_bw() + theme(panel.grid.minor = element_blank())
+         theme_bw(base_size = 12) + theme(panel.grid.minor = element_blank())
 ggsave("output/scree.pdf", width = 5, height = 3)
 }
 
@@ -153,6 +153,10 @@ baplot + scale_shape_discrete(name = "Weighting scheme", labels = c("Unadjusted"
                                                                     expression(ps(alpha, z)), expression(ps(z)))) + labs(x = "Absolute standardized mean difference") +
   guides(size="none", stroke="none", colour="none") +
   theme(
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.title = element_text(size = 11),
+    legend.text = element_text(size = 10),
     legend.position = c(0.98, 0.98),   # inside plot (x,y in [0,1])
     legend.justification = c(1, 1),    # anchor at top-right of legend box
     legend.background = element_rect(fill = "white", color = NA)
@@ -176,7 +180,7 @@ for (j in 1:N1) {
 }
 plot <- plot + geom_vline(xintercept = -.5, linetype="dashed", color="black")+ ylim(-.3, .4) +
                xlab("date") + ylab("return") + 
-               theme_bw() + 
+               theme_bw(base_size = 12) +
                theme(legend.position = c(.07,0.15),
                      legend.background = element_rect(fill="transparent"), 
                      panel.grid.minor = element_blank(),panel.grid.major = element_blank())
@@ -501,7 +505,7 @@ plot <- plot + geom_ribbon(aes(x=x, ymin=F11.lb, ymax=F11.ub), fill="grey85", al
                                      breaks = c("y0", "y1"),
                                      labels = c(expression(y[i](0)~"|"~t[i]==1), expression(y[i](1)~"|"~t[i]==1)),
                                      values = c('y1' = 'solid', 'y0' = 'dashed')) +
-               xlab("") + ylab("") +theme_bw() + xlim(-0.2, 0.6) +
+               xlab("") + ylab("") + theme_bw(base_size = 12) + xlim(-0.2, 0.6) +
                theme(legend.position = c(.85, 0.15),
                      legend.background = element_rect(fill="transparent"),
                      panel.grid.major=element_blank(), panel.grid.minor = element_blank())

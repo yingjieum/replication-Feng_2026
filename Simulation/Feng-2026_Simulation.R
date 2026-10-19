@@ -135,7 +135,7 @@ figure.plot <- ggplot(plot.data, aes(x = value)) +
   stat_function(fun = dnorm, args = list(mean = 0, sd = 1), linewidth = 1) +
   geom_vline(xintercept = 0, linetype = "dashed") +
   facet_wrap(~ series, nrow = 1, strip.position = "bottom") +
-  theme_classic() +
+  theme_classic(base_size = 12) +
   theme(
     strip.placement = "outside",
     strip.background = element_blank()

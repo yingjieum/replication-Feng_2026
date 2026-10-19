@@ -23,6 +23,8 @@ The application and simulation can be run independently.
 
 The application uses data from Daron Acemoglu, Simon Johnson, Amir Kermani, James Kwak, and Todd Mitton (2016), “The Value of Connections in Turbulent Times: Evidence from the United States,” *Journal of Financial Economics* 121(2), 368–391. The original study's replication files are available from the [MIT Economics Data Archive](https://economics.mit.edu/people/faculty/daron-acemoglu/data-archive).
 
+Following the complete-case restriction in the original study's synthetic-matching analysis, 20 of the original 603 firms are excluded because at least one of the three 2008 controls is missing, leaving 583 firms.
+
 `Application/data.mat` is the analysis-ready input. No preprocessing is needed before running the application script. The objects used by the code are:
 
 | Object                          | Description                                                                                                                                                                  |
